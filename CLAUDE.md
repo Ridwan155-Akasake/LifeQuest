@@ -45,7 +45,7 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 
 ## Next steps
 1. ✅ Pushed to GitHub `LifeQuest` (2026-11-21). Server access from Claude: `ssh -o BatchMode=yes kali '…'` works (alias in ~/.ssh/config). Guide-first still applies: show commands, get go, then run.
-2. Kali deploy (README "First deploy"; guide-first, user runs). Needs .env: POSTGRES_PASSWORD, OWNER_*, CRON_SECRET, VAPID (npm run vapid ONCE), optional TELEGRAM_BOT_TOKEN/CHAT_ID. First real compose up → expect fixes.
+2. RESUME HERE (paused 2026-11-21 by user): Kali deploy, 6 steps proposed, waiting for user's "go" on Step 1 (read-only preflight: port 3100, disk, docker networks, vault/Inbox paths). Then clone → ~/hq; secrets generated ON server (never in chat); owner password via hidden-prompt helper script (TODO write it); copy TELEGRAM token/chat id from bot .env only with user OK; compose up; seed; vault import dry; LAN login test. Kali deploy (README "First deploy"). Needs .env: POSTGRES_PASSWORD, OWNER_*, CRON_SECRET, VAPID (npm run vapid ONCE), optional TELEGRAM_BOT_TOKEN/CHAT_ID. First real compose up → expect fixes.
 3. DNS ridwansharif.com → Cloudflare (re-add portfolio Vercel records) + tunnel hostname hq. → phone install + notifications. Confirm with user before DNS.
 4. Calendar: both Google accounts; OAuth (free) both directions; ask which account receives new events.
 5. Bot takeover per PLAN §6b, one job at a time (Claude page needs Cloudflare Access first).
