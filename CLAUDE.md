@@ -44,7 +44,7 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 - Gotchas: PGlite URL needs `&pgbouncer=true&connection_limit=1`. Bash heredocs mangle `\` → write scripts to scratchpad, `python -I file`. TaskStop leaves npx child node alive → kill by port (Get-NetTCPConnection) after tests.
 
 ## Next steps
-1. User: create private GitHub repo `LifeQuest` → push.
+1. ✅ Pushed to GitHub `LifeQuest` (2026-11-21). Server access from Claude: `ssh -o BatchMode=yes kali '…'` works (alias in ~/.ssh/config). Guide-first still applies: show commands, get go, then run.
 2. Kali deploy (README "First deploy"; guide-first, user runs). Needs .env: POSTGRES_PASSWORD, OWNER_*, CRON_SECRET, VAPID (npm run vapid ONCE), optional TELEGRAM_BOT_TOKEN/CHAT_ID. First real compose up → expect fixes.
 3. DNS ridwansharif.com → Cloudflare (re-add portfolio Vercel records) + tunnel hostname hq. → phone install + notifications. Confirm with user before DNS.
 4. Calendar: both Google accounts; OAuth (free) both directions; ask which account receives new events.
