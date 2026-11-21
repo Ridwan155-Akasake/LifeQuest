@@ -9,7 +9,7 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", 
 
 export const metadata: Metadata = {
   title: { default: "HQ", template: "%s · HQ" },
-  description: "Ridwan's personal productivity system — quests, habits, logs, people.",
+  description: "Ridwan's HQ — tasks, habits, reminders. An early version of LifeQuest.",
   robots: { index: false, follow: false },
 };
 

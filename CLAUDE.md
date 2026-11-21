@@ -1,4 +1,4 @@
-# Personal Productivity System ("HQ") — project context
+# HQ (hq.ridwansharif.com) — project context
 
 Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full LifeQuest; that's parked). Subdomain of ridwansharif.com, name TBD (NOT "LifeQuest" — reserve that for big vision; user leaning plain e.g. tasks./HQ). Full plan: `PLAN.md`.
 

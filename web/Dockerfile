@@ -1,4 +1,4 @@
-# Personal productivity app — one Dockerfile, two images:
+# HQ (hq.ridwansharif.com) — one Dockerfile, two images:
 #   target "runner" → the web app (small: Next.js standalone server only)
 #   target "tools"  → migrations, seed, vault import (full node_modules + scripts)
 # Debian slim (not Alpine) so Prisma's engines match glibc + OpenSSL 3 with no extra config.

@@ -1,7 +1,9 @@
-# Personal Productivity System (HQ)
+# HQ
 
-Self-hosted personal productivity app: LifeQuest quests as a kanban board, habits, daily logs,
-streaks/XP, a personal CRM and a job-hunt pipeline. Single owner. Runs entirely on the homelab:
+**hq.ridwansharif.com** — an early version of LifeQuest.
+
+Self-hosted personal task tracker built for an ADHD brain: quick capture, a Today list, repeating
+tasks and habits, plus the LifeQuest quests board. Single owner. Runs entirely on the homelab:
 the app and its own Postgres database, with nothing shared with ARCNIR.
 
 - Plan, data model, phases: [`PLAN.md`](PLAN.md)
@@ -74,19 +76,19 @@ flowchart LR
 
 ## Backups and restore
 
-Dumps land in `./backups/productivity-YYYY-MM-DD_HHMM.dump`. **Sync that folder off the laptop**
+Dumps land in `./backups/hq-YYYY-MM-DD_HHMM.dump`. **Sync that folder off the laptop**
 (NAS or Syncthing). A backup that lives only on the same disk dies with that disk.
 
 Check the backup log with `docker compose logs backup`. To test a restore (do this once after the first deploy):
 
 ```bash
-docker compose exec -T db pg_restore -U hq -d productivity --clean --if-exists < backups/<file>.dump
+docker compose exec -T db pg_restore -U hq -d hq --clean --if-exists < backups/<file>.dump
 ```
 
 ## Public access (Cloudflare Tunnel)
 
 1. Cloudflare Zero Trust → Networks → Tunnels → create a tunnel and copy its token into `CF_TUNNEL_TOKEN`.
-2. Add a public hostname, e.g. `hq.ridwansharif.com`, pointing to service `http://web:3000`.
+2. Add a public hostname, `hq.ridwansharif.com`, pointing to service `http://web:3000`.
    This requires the `ridwansharif.com` DNS zone to be on Cloudflare.
 3. Start it with `docker compose --profile tunnel up -d`.
 4. Set `APP_URL=https://<sub>.ridwansharif.com`, `WEB_BIND=127.0.0.1` and `COOKIE_SECURE=true`,

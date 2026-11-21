@@ -1,11 +1,11 @@
 #!/bin/sh
-# Nightly pg_dump for the productivity DB. Runs inside the postgres:18 image.
-# Writes ./backups/productivity-YYYY-MM-DD_HHMM.dump (custom format, restore with pg_restore)
+# Nightly pg_dump for the HQ database. Runs inside the postgres:18 image.
+# Writes ./backups/hq-YYYY-MM-DD_HHMM.dump (custom format, restore with pg_restore)
 # and deletes dumps older than BACKUP_KEEP_DAYS. Sync ./backups off this machine (NAS/Syncthing).
 set -u
 
 dump() {
-  f="/backups/productivity-$(date +%F_%H%M).dump"
+  f="/backups/hq-$(date +%F_%H%M).dump"
   if pg_dump -Fc -f "$f.tmp"; then
     mv "$f.tmp" "$f"
     echo "$(date -Is) backup ok: $f ($(du -h "$f" | cut -f1))"
@@ -13,7 +13,7 @@ dump() {
     rm -f "$f.tmp"
     echo "$(date -Is) BACKUP FAILED" >&2
   fi
-  find /backups -name 'productivity-*.dump' -mtime +"$BACKUP_KEEP_DAYS" -delete
+  find /backups -name 'hq-*.dump' -mtime +"$BACKUP_KEEP_DAYS" -delete
 }
 
 mkdir -p /backups

@@ -1,8 +1,8 @@
 {
-  "name": "personal-productivity",
+  "name": "hq",
   "version": "0.1.0",
   "private": true,
-  "description": "Personal productivity system — LifeQuest kanban, habits, daily logs, CRM. Subdomain of ridwansharif.com.",
+  "description": "HQ (hq.ridwansharif.com) \u2014 personal task tracker, early version of LifeQuest. Self-hosted on the homelab.",
   "engines": {
     "node": ">=22"
   },

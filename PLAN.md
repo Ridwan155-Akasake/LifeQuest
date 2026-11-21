@@ -1,4 +1,6 @@
-# Personal Productivity System — Plan
+# HQ — Plan
+
+**hq.ridwansharif.com** — an early version of LifeQuest.
 
 > **A simple task tracker so my ADHD brain doesn't forget what I assigned myself.**
 > Capture in seconds, see what's due, get reminded. Self-hosted on the homelab, on a
@@ -40,7 +42,7 @@ flowchart LR
   U[Me: browser / phone PWA] -->|HTTPS| CF[Cloudflare edge<br/>sub.ridwansharif.com<br/>+ optional Cloudflare Access]
   CF -->|Cloudflare Tunnel| T[cloudflared]
   P[Portfolio on Vercel<br/>ridwansharif.com] -. link .-> CF
-  subgraph Homelab["Kali homelab: Docker Compose stack 'productivity'"]
+  subgraph Homelab["Kali homelab: Docker Compose stack 'hq'"]
     T --> W[web: Next.js standalone]
     W -->|private Docker network| DB[(postgres:18<br/>own volume)]
     B[backup: nightly pg_dump] --> DB
@@ -138,7 +140,7 @@ The full schema is in `web/prisma/schema.prisma`. Key ideas:
 
 ## 7. Homelab deployment (on Kali, guide first; nothing runs until you say go)
 
-Planned stack, in its own folder on the server (e.g. `~/productivity/`, cloned from the new repo):
+Planned stack, in its own folder on the server (e.g. `~/hq/`, cloned from the new repo):
 
 | Service | Image | Notes |
 |---|---|---|

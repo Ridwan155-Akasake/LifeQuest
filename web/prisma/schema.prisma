@@ -1,4 +1,4 @@
-// Personal productivity system — Prisma schema (homelab Postgres tenant `productivity`).
+// HQ — Prisma schema (own Postgres 18 in the HQ Docker stack).
 //
 // Conventions (borrowed from ARCNIR's work module):
 //   • Status / kind / category are String unions validated with Zod at the app boundary

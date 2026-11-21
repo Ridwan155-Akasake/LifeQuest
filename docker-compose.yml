@@ -1,13 +1,13 @@
-# Personal productivity app — self-hosted stack (Kali homelab).
+# HQ (hq.ridwansharif.com) — self-hosted stack on the Kali homelab.
 # Fully separate from ARCNIR: own Postgres, own volumes, own networks, own tunnel.
 #
 #   docker compose up -d --build                  # db + migrate + web + backup
 #   docker compose run --rm tools npm run db:seed # one-off jobs (see README.md)
 #   docker compose --profile tunnel up -d         # add Cloudflare Tunnel once the token exists
 
-name: productivity
+name: hq
 
-x-db-url: &db-url postgresql://hq:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/productivity
+x-db-url: &db-url postgresql://hq:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/hq
 
 services:
   db:
@@ -16,13 +16,13 @@ services:
     environment:
       POSTGRES_USER: hq
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: productivity
+      POSTGRES_DB: hq
       TZ: ${APP_TIMEZONE:-America/Chicago}
     # Data lives in a visible folder next to this file. Postgres 18 mounts at /var/lib/postgresql.
     volumes:
       - ./data/postgres:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hq -d productivity"]
+      test: ["CMD-SHELL", "pg_isready -U hq -d hq"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -31,7 +31,7 @@ services:
 
   migrate:
     build: { context: ./web, target: tools }
-    image: productivity-tools
+    image: hq-tools
     command: ["npx", "prisma", "migrate", "deploy"]
     environment:
       DATABASE_URL: *db-url
@@ -42,7 +42,7 @@ services:
 
   web:
     build: { context: ./web, target: runner }
-    image: productivity-web
+    image: hq-web
     restart: unless-stopped
     environment:
       DATABASE_URL: *db-url
@@ -67,7 +67,7 @@ services:
       PGHOST: db
       PGUSER: hq
       PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: productivity
+      PGDATABASE: hq
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
       BACKUP_HOUR: ${BACKUP_HOUR:-03}
       TZ: ${APP_TIMEZONE:-America/Chicago}
@@ -80,7 +80,7 @@ services:
 
   # One-off jobs: seed, vault import. Not started by `up`.
   tools:
-    image: productivity-tools
+    image: hq-tools
     profiles: [tools]
     environment:
       DATABASE_URL: *db-url
