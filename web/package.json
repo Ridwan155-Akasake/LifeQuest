@@ -1,0 +1,46 @@
+{
+  "name": "personal-productivity",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal productivity system — LifeQuest kanban, habits, daily logs, CRM. Subdomain of ridwansharif.com.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "hash-password": "node scripts/hash-password.mjs",
+    "vault:import": "tsx scripts/vault-import.ts",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.0",
+    "gray-matter": "^4.0.3",
+    "next": "^16.2.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "prisma": "^6.16.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2",
+    "effect": "^3.22.5"
+  }
+}

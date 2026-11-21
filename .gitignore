@@ -1,0 +1,23 @@
+# Secrets
+.env
+.env.local
+web/.env
+web/.env.local
+
+# Data + backups — never in git
+data/
+backups/
+vault-backups/
+web/vault-backups/
+
+# Build output / deps
+node_modules/
+.next/
+*.tsbuildinfo
+web/next-env.d.ts
+
+# Reference material kept locally (contains ARCNIR's private code)
+arcnir-site-main.zip
+
+# Local doc backups
+*.bak-*

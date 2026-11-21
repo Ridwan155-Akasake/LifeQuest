@@ -1,0 +1,254 @@
+// Personal productivity system — Prisma schema (homelab Postgres tenant `productivity`).
+//
+// Conventions (borrowed from ARCNIR's work module):
+//   • Status / kind / category are String unions validated with Zod at the app boundary
+//     (see src/lib/domain.ts) — no native enums, so adding a value needs no migration.
+//   • Calendar days (due, habit check, daily log) are @db.Date — a DAY, not an instant,
+//     so they never shift between timezones.
+//   • Colours are THEME TOKEN keys (accent | live | warn | stop | info), never literals.
+//   • `vaultId` / `vaultPath` / `vaultHash` tie a row to its LifeQuest Markdown source so
+//     the vault import is idempotent and the export knows what changed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Life structure ───────────────────────────────────────────────────────────
+
+/// A LifeQuest Campaign (major life area) or Dev Project.
+model Area {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  /// campaign | dev-project
+  kind        String    @default("campaign")
+  /// One-sentence win condition (the blockquote under the title in the vault).
+  winCondition String?
+  color       String    @default("accent")
+  /// active | paused | done
+  status      String    @default("active")
+  order       Int       @default(0)
+  vaultId     String?   @unique
+  vaultPath   String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tasks       Task[]
+}
+
+// ── Kanban (ported from ARCNIR WorkflowNode / Task) ──────────────────────────
+
+/// A kanban board: "Quests", "Job hunt", or anything custom.
+model Board {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  /// quests | jobs | custom — decides the default card kind + extra card fields.
+  kind      String   @default("custom")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  columns   Column[]
+  tasks     Task[]
+}
+
+/// A board column. Its NAME is free text; its CATEGORY is what it MEANS
+/// (backlog | todo | in-progress | review | done | canceled) and sets the status of every
+/// task moved into it — so done/overdue/XP work whatever the column is called.
+model Column {
+  id        String   @id @default(cuid())
+  boardId   String
+  title     String
+  category  String   @default("todo")
+  order     Int      @default(0)
+  /// Optional WIP limit — the column header warns when exceeded.
+  wipLimit  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([boardId, order])
+}
+
+/// Everything actionable: quest, step, task, habit, job application.
+model Task {
+  id           String    @id @default(cuid())
+  title        String
+  /// Markdown.
+  description  String?
+  /// quest | step | task | habit | job
+  kind         String    @default("task")
+  boardId      String?
+  columnId     String?
+  order        Int       @default(0)
+  /// Derived from the column category on every move; also set directly for steps/habits.
+  status       String    @default("todo")
+  /// low | medium | high | urgent
+  priority     String    @default("medium")
+  areaId       String?
+  /// Step → its quest. One level only (enforced in the service, like ARCNIR subtasks).
+  parentId     String?
+  startOn      DateTime? @db.Date
+  dueOn        DateTime? @db.Date
+  completedAt  DateTime?
+  archivedAt   DateTime?
+  /// LifeQuest `weekly_focus: true`.
+  weeklyFocus  Boolean   @default(false)
+  /// XP granted on completion (or per habit check).
+  xp           Int       @default(10)
+  /// LifeQuest "> 💬 Ask Claude:" prompt for this step.
+  claudePrompt String?
+  /// Habits only: daily | weekdays | weekly:mon,wed,fri
+  recurrence   String?
+  /// CRM link — follow-up task or job application contact.
+  contactId    String?
+  /// Kind-specific extras (job: company, url, salary, source…). Zod-validated per kind.
+  meta         Json      @default("{}")
+  vaultId      String?   @unique
+  vaultPath    String?
+  vaultHash    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  board       Board?       @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  column      Column?      @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  area        Area?        @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  parent      Task?        @relation("Steps", fields: [parentId], references: [id], onDelete: Cascade)
+  steps       Task[]       @relation("Steps")
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  habitChecks HabitCheck[]
+  labels      TaskLabel[]
+  activity    Activity[]
+
+  @@index([boardId, columnId, order])
+  @@index([areaId])
+  @@index([parentId, order])
+  @@index([kind, status])
+  @@index([dueOn])
+  @@index([contactId])
+}
+
+/// One row per habit per day it was done. "Done today" = a row exists for today —
+/// nothing ever has to reset at midnight.
+model HabitCheck {
+  id        String   @id @default(cuid())
+  taskId    String
+  on        DateTime @db.Date
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, on])
+  @@index([on])
+}
+
+model Label {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  color      String      @default("accent")
+  archivedAt DateTime?
+  createdAt  DateTime    @default(now())
+  tasks      TaskLabel[]
+}
+
+model TaskLabel {
+  taskId  String
+  labelId String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@index([labelId])
+}
+
+/// Append-only history (ARCNIR TaskActivity). Doubles as the XP ledger: `xp` is what this
+/// event earned (negative when a completion is undone), so level/streak are always
+/// recomputable from this table and never drift.
+model Activity {
+  id        String   @id @default(cuid())
+  taskId    String?
+  /// task.created | task.moved | task.completed | task.reopened | habit.checked |
+  /// habit.unchecked | log.written | contact.touched | vault.imported
+  type      String
+  data      Json     @default("{}")
+  xp        Int      @default(0)
+  /// Local calendar day the event counts toward (streaks).
+  on        DateTime @db.Date
+  createdAt DateTime @default(now())
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([on])
+  @@index([taskId, createdAt])
+  @@index([type, createdAt])
+}
+
+// ── Daily logs (LifeQuest _Templates/Daily Log.md) ───────────────────────────
+
+model DailyLog {
+  id          String   @id @default(cuid())
+  on          DateTime @unique @db.Date
+  oneWord     String?
+  oneThing    String?
+  /// 1–5
+  moodMorning Int?
+  moodEvening Int?
+  energy      Int?
+  gratitude   String?
+  wins        String?
+  blockers    String?
+  /// Free Markdown.
+  body        String?
+  vaultPath   String?
+  vaultHash   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ── Personal CRM (adapted from ARCNIR Lead / Client / communication log) ─────
+
+model Contact {
+  id                String        @id @default(cuid())
+  name              String
+  company           String?
+  role              String?
+  email             String?
+  phone             String?
+  url               String?
+  /// friend | family | cofounder | client | recruiter | mentor | network
+  relationship      String        @default("network")
+  /// active | warm | cold | archived
+  stage             String        @default("active")
+  tags              String[]      @default([])
+  notes             String?
+  lastContactOn     DateTime?     @db.Date
+  nextFollowUpOn    DateTime?     @db.Date
+  /// Auto-schedule the next follow-up this many days after each interaction.
+  followUpEveryDays Int?
+  archivedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  interactions      Interaction[]
+  tasks             Task[]
+
+  @@index([nextFollowUpOn])
+  @@index([relationship])
+}
+
+model Interaction {
+  id        String   @id @default(cuid())
+  contactId String
+  /// call | email | meeting | message | note
+  type      String   @default("note")
+  on        DateTime @db.Date
+  summary   String
+  nextStep  String?
+  createdAt DateTime @default(now())
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, on])
+}

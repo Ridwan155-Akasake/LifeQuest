@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — the ONLY place colours live (ARCNIR rule: no literal colours in
+ * components). Accent follows the portfolio's 4-theme system via [data-accent].
+ */
+@theme {
+  --color-base: #070a12;
+  --color-base-2: #0b1019;
+  --color-surface: #111827;
+  --color-line: #1e293b;
+  --color-line-strong: #334155;
+  --color-fg: #e5e9f0;
+  --color-fg-muted: #9aa5b4;
+  --color-fg-faint: #64748b;
+
+  --color-accent: var(--accent, #22d3ee);
+  --color-live: #34d399;
+  --color-warn: #fbbf24;
+  --color-stop: #f87171;
+  --color-info: #60a5fa;
+
+  --radius-btn: 10px;
+  --radius-card: 16px;
+
+  --font-serif: var(--font-lora), Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+:root { --accent: #22d3ee; }
+[data-accent="green"] { --accent: #4ade80; }
+[data-accent="crimson"] { --accent: #f43f5e; }
+[data-accent="violet"] { --accent: #a78bfa; }
+
+html { color-scheme: dark; }
+body {
+  background: var(--color-base);
+  color: var(--color-fg);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin scrollbars for the horizontal board. */
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

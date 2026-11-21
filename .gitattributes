@@ -1,0 +1,4 @@
+# Force LF everywhere: this repo deploys to Linux (CRLF breaks shell scripts)
+* text=auto eol=lf
+*.zip binary
+*.dump binary
