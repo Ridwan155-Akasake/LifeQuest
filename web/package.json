@@ -18,7 +18,8 @@
     "db:studio": "prisma studio",
     "hash-password": "node scripts/hash-password.mjs",
     "vault:import": "tsx scripts/vault-import.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "vapid": "node scripts/vapid.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.16.0",
@@ -27,6 +28,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "server-only": "^0.0.1",
+    "web-push": "^3.6.7",
     "zod": "^4.1.0"
   },
   "devDependencies": {
@@ -34,6 +36,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "prisma": "^6.16.0",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.20.0",

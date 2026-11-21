@@ -134,9 +134,33 @@ The full schema is in `web/prisma/schema.prisma`. Key ideas:
 | 1 | Foundation: login, shell, schema, Quests board, Today, habits, vault import | ✅ 2026-10-06 |
 | 2 | Docker stack + own git repo | ✅ 2026-11-21 (not yet run on Kali) |
 | 3 | Quick capture, Inbox, repeating tasks, trimmed Today, All tasks, task edit | ✅ 2026-11-21 |
-| 4 | Telegram reminders: morning list + due pings (reuse SecondBrain bot) | ⬜ next |
-| 5 | Deploy on Kali + tunnel/subdomain | ⬜ |
+| 4 | Timed tasks + push notifications (installable app, Done/Snooze, morning digest, Telegram fallback) | ✅ 2026-11-21 (verified with a real Edge push; not yet on a phone) |
+| 5 | Deploy on Kali + tunnel + hq.ridwansharif.com (DNS → Cloudflare) | ⬜ next, needs user |
+| 6 | Take over the SecondBrain bot's jobs (see below) | ⬜ |
+| 7 | Calendar sync: HQ ⇄ calendar, both directions (see below) | ⬜ |
+| 8 | Android app wrapper + home-screen widget (Today list, quick add) | ⬜ |
 | later | Parked LifeQuest features (see table above) if still wanted after a month of daily use | ⬜ |
+
+## 6b. Taking over the SecondBrain Telegram bot (decided 2026-11-21)
+
+Bot lives at `L:\SecondBrain\secondbrain-bot` (Python, on Kali). Decision: **HQ takes over every
+job; the bot stays as a thin backup** (messages → HQ tasks/captures, fallback alert channel).
+Move one job at a time, both running side by side, switch off in the bot only once proven.
+
+| Bot job today | In HQ |
+|---|---|
+| Text → headless Claude Code in the LifeQuest vault (sessions, `/reset`) | "Ask Claude" page; same `claude -p` call + token, in an HQ container with the vault mounted. Owner login + Cloudflare Access before exposing it |
+| `note:` / voice / photo / document → `SecondBrain/Inbox` | Attachments on the capture box writing the SAME Inbox files (Whisper + agents unchanged) |
+| `/notify` reminders (once/daily/weekly/random, Ollama parse) | Timed tasks ✅ (instant regex parse, no Ollama). Still to port: random nudges + migrate the bot's SQLite reminders |
+| `/reminders`, `/cancel` | All tasks page / task delete ✅ |
+| Approval buttons for host scripts (`/approvals` req/ans files) | Approvals list in HQ + notification with Yes/No |
+| `/status` | Today summary |
+
+## 6c. Calendar sync (asked 2026-11-21)
+
+Two directions: tasks with a date/time **create events** in the calendar, and calendar events
+**show up in HQ** (Today + All tasks). Bot's PLAN-notify-reminders.md Phase 4 already sketched
+Google Calendar via OAuth refresh token (no recurring cost). Open: which calendar/account.
 
 ## 7. Homelab deployment (on Kali, guide first; nothing runs until you say go)
 

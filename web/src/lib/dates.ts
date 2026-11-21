@@ -88,3 +88,41 @@ export function nextDue(recurrence: string, dueIso: string, todayIso: string, mo
 
 export const RECURRENCE_LABEL: Record<string, string> = { daily: "Every day", weekdays: "Weekdays", weekly: "Every week", monthly: "Every month" };
 export const recurrenceLabel = (r: string) => RECURRENCE_LABEL[r] ?? `Every ${r.replace("weekly:", "").split(",").join(", ")}`;
+
+/** Current local date + minutes since local midnight in `tz` (for capture + reminders). */
+export function localNow(tz = APP_TZ, now = new Date()): { date: string; minutes: number } {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value]),
+  );
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) };
+}
+
+/** Offset of `tz` from UTC at `instant`, in minutes (Chicago in winter → -360). */
+function tzOffsetMinutes(instant: Date, tz: string): number {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })
+      .formatToParts(instant)
+      .map((x) => [x.type, x.value]),
+  );
+  const asUtc = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second));
+  return Math.round((asUtc - instant.getTime()) / 60_000);
+}
+
+/**
+ * Local date + "HH:MM" in `tz` → the real instant. Handles daylight saving: the offset is
+ * re-checked at the resulting instant, so 7:00 PM stays 7:00 PM across the DST switch.
+ */
+export function zonedToUtc(dateIso: string, time: string, tz = APP_TZ): Date {
+  const naive = Date.UTC(Number(dateIso.slice(0, 4)), Number(dateIso.slice(5, 7)) - 1, Number(dateIso.slice(8, 10)), Number(time.slice(0, 2)), Number(time.slice(3, 5)));
+  let guess = naive - tzOffsetMinutes(new Date(naive), tz) * 60_000;
+  guess = naive - tzOffsetMinutes(new Date(guess), tz) * 60_000;
+  return new Date(guess);
+}
+
+/** "19:05" → "7:05 PM". */
+export function formatClock(time: string): string {
+  const h = Number(time.slice(0, 2));
+  return `${((h + 11) % 12) + 1}:${time.slice(3, 5)} ${h < 12 ? "AM" : "PM"}`;
+}

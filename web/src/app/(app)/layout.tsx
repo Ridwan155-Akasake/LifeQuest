@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               {b.name}
             </NavLink>
           ))}
+          <NavLink href="/settings">Settings</NavLink>
         </nav>
         <form action={logoutAction} className="absolute bottom-4 left-4 hidden md:block">
           <button className="text-xs text-fg-faint hover:text-fg">Sign out</button>

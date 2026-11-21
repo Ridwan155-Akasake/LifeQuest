@@ -96,6 +96,13 @@ model Task {
   parentId     String?
   startOn      DateTime? @db.Date
   dueOn        DateTime? @db.Date
+  /// "HH:MM" local time (APP_TIMEZONE). Set = "remind me at this time on dueOn".
+  dueTime      String?
+  /// The instant the reminder fires = dueOn + dueTime in APP_TIMEZONE. Kept in sync by the
+  /// service on every date/time change and repeat roll-forward; the worker polls this.
+  remindAt     DateTime?
+  /// When the reminder for the current remindAt was sent. Cleared whenever remindAt moves.
+  remindedAt   DateTime?
   completedAt  DateTime?
   archivedAt   DateTime?
   /// LifeQuest `weekly_focus: true`.
@@ -132,6 +139,7 @@ model Task {
   @@index([kind, status])
   @@index([dueOn])
   @@index([contactId])
+  @@index([remindAt])
 }
 
 /// One row per habit per day it was done. "Done today" = a row exists for today —
@@ -251,4 +259,20 @@ model Interaction {
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([contactId, on])
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+/// A browser/phone that accepted push notifications (Web Push). One row per device.
+model PushSubscription {
+  id        String    @id @default(cuid())
+  endpoint  String    @unique
+  p256dh    String
+  auth      String
+  /// Short device label for the settings list, e.g. "Android · Chrome".
+  device    String?
+  createdAt DateTime  @default(now())
+  lastOkAt  DateTime?
+  /// Consecutive delivery failures; the row is dropped when the push service says it's gone.
+  failCount Int       @default(0)
 }

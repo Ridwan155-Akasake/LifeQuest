@@ -21,23 +21,32 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 - IN: quick capture, Today (overdue/today/inbox/next7/done), repeating tasks, All tasks, habits, Quests board + vault import, Telegram reminders (next).
 - PARKED (kept, hidden/unbuilt): XP/levels UI, job-hunt board (nav filters kind=jobs), CRM pages, daily-log pages, vault write-back, AI quests. Don't build unless user asks.
 
+## Decisions 2026-11-21 (later)
+- Name HQ, hq.ridwansharif.com, "early version of LifeQuest".
+- Phone: Android + website now, iPhone later. Widgets need native wrapper (Android free/sideload; iOS = Mac + $99/yr → user's call later).
+- SecondBrain bot (`L:\SecondBrain\secondbrain-bot`, Python on Kali): HQ takes over ALL jobs (Claude agent, Inbox capture, reminders, approvals); bot = thin backup. Migrate one job at a time, side by side. Mapping in PLAN §6b.
+- Calendar: user wants HQ ⇄ calendar both ways (create events + import events). Which calendar/account NOT confirmed yet. PLAN §6c.
+- Order: deploy + notifications first.
+
 ## Key files (web/)
 - `prisma/schema.prisma`, `prisma/migrations/20261006000000_init/`, `prisma/seed.ts` (boards quests + job-hunt, labels)
 - `src/lib/work.ts` service (only place status/XP change) · `src/lib/actions.ts` server actions · `src/lib/domain.ts` unions+Zod
 - `src/components/board/task-board.tsx` (ARCNIR port) · `src/app/(app)/page.tsx` Today · `task/[id]` quest detail
 - `scripts/vault-import.ts` (dry-run default, `--apply`) · `scripts/hash-password.mjs`
+- Reminders: Task.dueTime/remindAt/remindedAt (migration 20261121000000), `reminderFor()` in work.ts keeps remindAt synced; `app/api/cron/tick` (CRON_SECRET, ticker container `deploy/ticker.mjs`); `lib/push.ts` web-push + Telegram fallback; `public/sw.js`; `app/manifest.ts`; `app/(app)/settings`; `api/push/{subscribe,action,test}`.
 - `src/lib/capture.ts` parseCapture (pure, client+server) · `src/lib/dates.ts` nextDue/RECURRENCE_RE · `components/capture/capture-bar.tsx` (in shell, "/" focuses) · `components/today/task-row.tsx` · `app/(app)/tasks` All tasks · `task/[id]/task-edit.tsx`
 
 ## Status
-- Built + verified on throwaway PGlite: Phase 0–2 (2026-10-06); Docker stack + git (2026-11-21); simple-tracker v1 (2026-11-21): capture parser 18/18 cases pass, browser E2E (capture 4 kinds, daily roll→tomorrow, inbox Tomorrow btn, weekly repeat edit, no-due guard, All tasks, vault copy import doesn't flood, mobile ok, 0 console errors). tsc/build ok, npm audit 0.
-- NOT done: real DB, `docker compose up` on Kali (no Docker on Windows), push (no remote), real vault stamp, reminders.
-- Git: repo at project root, branch main, LF forced. User pushes.
-- Gotchas: PGlite test URL needs `&pgbouncer=true&connection_limit=1`. Bash heredocs mangle `\` and some quotes on this machine → write scripts to scratchpad file, run `python -I file`. Automation key "slash" ≠ "/" (capture hotkey works with real "/").
+- Built + verified on throwaway PGlite: Phase 0–2 (2026-10-06); Docker + git; simple tracker v1; HQ rename; timed tasks + push (2026-11-21).
+- Push verified: 30/30 API E2E vs fake push service (encryption/VAPID/410 cleanup/no dup/digest once/Done/Snooze/auth 401/403) + REAL push in headless Edge (WNS endpoint → SW showed notification). Time parser 17/17 incl DST. NOT tested: Telegram fallback send (no token here), real Android phone.
+- NOT done: real DB, compose up on Kali, push to GitHub (no remote), DNS→Cloudflare, real vault stamp, bot takeover, calendar.
+- Embedded Claude browser pane blocks SW + notifications → test push in headless Edge via playwright-core (scratchpad).
+- Gotchas: PGlite URL needs `&pgbouncer=true&connection_limit=1`. Bash heredocs mangle `\` → write scripts to scratchpad, `python -I file`. TaskStop leaves npx child node alive → kill by port (Get-NetTCPConnection) after tests.
 
 ## Next steps
-1. User: pick app name/subdomain → rename (title "Ridwan · HQ" in login + shell + metadata, package.json name, compose `name:`, docs) → create private GitHub repo → push.
-2. Telegram reminders: morning list (overdue+today) + due pings. Reuse SecondBrain bot (token on Kali). Likely a `reminders` service in compose (cron loop like backup.sh) hitting an internal route or using Prisma directly. Confirm bot/token location with user first.
-3. Kali deploy per README (guide-first; user runs). First real compose up → expect fixes. Seed → vault import dry → `--apply` only with user go.
-4. Off-box backup sync of ./backups.
-5. Tunnel + subdomain: needs ridwansharif.com DNS on Cloudflare — confirm first.
-6. Parked items only on request.
+1. User: create private GitHub repo `hq` → push.
+2. Kali deploy (README "First deploy"; guide-first, user runs). Needs .env: POSTGRES_PASSWORD, OWNER_*, CRON_SECRET, VAPID (npm run vapid ONCE), optional TELEGRAM_BOT_TOKEN/CHAT_ID. First real compose up → expect fixes.
+3. DNS ridwansharif.com → Cloudflare (re-add portfolio Vercel records) + tunnel hostname hq. → phone install + notifications. Confirm with user before DNS.
+4. Calendar: ask which calendar/account; plan OAuth (Google free) both directions.
+5. Bot takeover per PLAN §6b, one job at a time (Claude page needs Cloudflare Access first).
+6. Android wrapper + widget.

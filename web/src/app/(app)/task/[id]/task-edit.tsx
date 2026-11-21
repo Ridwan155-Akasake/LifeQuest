@@ -15,7 +15,7 @@ const REPEATS = [
 ];
 
 /** Due date, repeat, priority, delete — changes save as soon as you pick them. */
-export function TaskEdit({ id, dueOn, recurrence, priority, backHref }: { id: string; dueOn: string | null; recurrence: string | null; priority: string; backHref: string }) {
+export function TaskEdit({ id, dueOn, dueTime, recurrence, priority, backHref }: { id: string; dueOn: string | null; dueTime: string | null; recurrence: string | null; priority: string; backHref: string }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
@@ -34,6 +34,10 @@ export function TaskEdit({ id, dueOn, recurrence, priority, backHref }: { id: st
         <label className="flex flex-col gap-1">
           <span className="font-mono text-[10px] uppercase tracking-wider text-fg-faint">Due</span>
           <input type="date" defaultValue={dueOn ?? ""} onChange={(e) => save({ dueOn: e.target.value || null })} className={field} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-fg-faint">Remind at</span>
+          <input type="time" defaultValue={dueTime ?? ""} onChange={(e) => save({ dueTime: e.target.value || null })} className={field} />
         </label>
         <label className="flex flex-col gap-1">
           <span className="font-mono text-[10px] uppercase tracking-wider text-fg-faint">Repeats</span>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { quickCaptureAction } from "@/lib/actions";
 import { parseCapture } from "@/lib/capture";
-import { recurrenceLabel, relativeDue, todayISO } from "@/lib/dates";
+import { formatClock, localNow, recurrenceLabel, relativeDue } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 
 /**
@@ -17,8 +17,14 @@ export function CaptureBar() {
   const [flash, setFlash] = useState<{ msg: string; tone: "ok" | "err" } | null>(null);
   const [pending, start] = useTransition();
   const ref = useRef<HTMLInputElement>(null);
-  const today = todayISO();
-  const preview = text.trim() ? parseCapture(text, today) : null;
+  const now = localNow();
+  const today = now.date;
+  const preview = text.trim() ? parseCapture(text, today, now.minutes) : null;
+
+  // Home-screen shortcut "Add a task" opens /?capture=1 → jump straight into the box.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("capture") === "1") ref.current?.focus();
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -44,7 +50,7 @@ export function CaptureBar() {
       onSubmit={(e) => {
         e.preventDefault();
         if (!preview) return;
-        const where = preview.dueOn ? relativeDue(preview.dueOn, today).label : "Inbox";
+        const where = preview.dueOn ? `${relativeDue(preview.dueOn, today).label}${preview.dueTime ? ` ${formatClock(preview.dueTime)}` : ""}` : "Inbox";
         start(async () => {
           const res = await quickCaptureAction(text);
           if (!res.ok) return setFlash({ msg: res.error, tone: "err" });
@@ -68,7 +74,7 @@ export function CaptureBar() {
           onKeyDown={(e) => e.key === "Escape" && (setText(""), ref.current?.blur())}
           maxLength={300}
           autoComplete="off"
-          placeholder="Add a task…  e.g. “call dentist tomorrow” or “pay rent every month 12/1 !”"
+          placeholder="Add a task…  e.g. “call dentist tomorrow at 3pm” or “pay rent every month 12/1 !”"
           className="h-11 min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-faint"
         />
         <kbd className="hidden rounded border border-line px-1.5 font-mono text-[10px] text-fg-faint md:inline">/</kbd>
@@ -82,6 +88,7 @@ export function CaptureBar() {
           : preview && (
               <>
                 “{preview.title}” → {preview.dueOn ? `due ${relativeDue(preview.dueOn, today).label}` : "Inbox (no date)"}
+                {preview.dueTime && ` · ⏰ ${formatClock(preview.dueTime)}`}
                 {preview.recurrence && ` · ↻ ${recurrenceLabel(preview.recurrence)}`}
                 {preview.priority !== "medium" && ` · ${preview.priority}`}
               </>

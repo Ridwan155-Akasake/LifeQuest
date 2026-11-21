@@ -2,7 +2,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 
 import { db } from "./db";
-import { addDays, fromDbDate, habitDueOn, nextDue, todayISO, toDbDate } from "./dates";
+import { addDays, fromDbDate, habitDueOn, localNow, nextDue, todayISO, toDbDate, zonedToUtc } from "./dates";
 import { parseCapture } from "./capture";
 import { CLOSED, DEFAULT_XP, isClosed, type Category, type TaskKind } from "./domain";
 
@@ -13,6 +13,14 @@ import { CLOSED, DEFAULT_XP, isClosed, type Category, type TaskKind } from "./do
  */
 
 type Tx = Prisma.TransactionClient;
+
+/**
+ * The reminder moment for a task: its due date at its due time, in APP_TIMEZONE. No time →
+ * no reminder. Always clears `remindedAt`, so moving a reminder re-arms it.
+ */
+function reminderFor(dueOn: string | null | undefined, dueTime: string | null | undefined) {
+  return { remindAt: dueOn && dueTime ? zonedToUtc(dueOn, dueTime) : null, remindedAt: null };
+}
 
 // ── Read models (what the UI receives — plain, serialisable) ─────────────────
 
@@ -173,14 +181,14 @@ export async function moveTask(id: string, columnId: string, index?: number) {
  */
 export async function setTaskDone(id: string, done: boolean): Promise<{ nextDue?: string }> {
   return db.$transaction(async (tx) => {
-    const t = await tx.task.findUnique({ where: { id }, select: { id: true, status: true, xp: true, kind: true, recurrence: true, dueOn: true, meta: true } });
+    const t = await tx.task.findUnique({ where: { id }, select: { id: true, status: true, xp: true, kind: true, recurrence: true, dueOn: true, dueTime: true, meta: true } });
     if (!t) throw new Error("Task not found");
     if (done && t.recurrence && t.kind !== "habit") {
       const today = todayISO();
       const from = t.dueOn ? fromDbDate(t.dueOn) : today;
       const monthDay = (t.meta as { monthDay?: unknown } | null)?.monthDay;
       const next = nextDue(t.recurrence, from, today, typeof monthDay === "number" ? monthDay : undefined);
-      await tx.task.update({ where: { id }, data: { dueOn: toDbDate(next), status: "todo", completedAt: null } });
+      await tx.task.update({ where: { id }, data: { dueOn: toDbDate(next), status: "todo", completedAt: null, ...reminderFor(next, t.dueTime) } });
       await tx.activity.create({ data: { taskId: id, type: "task.completed", xp: t.xp, on: toDbDate(today), data: { kind: t.kind, repeat: true, was: from, next } } });
       return { nextDue: next };
     }
@@ -194,26 +202,32 @@ export const setStepDone = setTaskDone;
 
 /** Quick capture: one line of text -> a task (see lib/capture.ts for the syntax). */
 export async function quickCapture(text: string) {
-  const c = parseCapture(text, todayISO());
+  const now = localNow();
+  const c = parseCapture(text, now.date, now.minutes);
   if (!c.title) throw new Error("Type something first");
-  return createTask({ title: c.title.slice(0, 200), kind: "task", priority: c.priority, dueOn: c.dueOn, recurrence: c.recurrence });
+  return createTask({ title: c.title.slice(0, 200), kind: "task", priority: c.priority, dueOn: c.dueOn, dueTime: c.dueTime, recurrence: c.recurrence });
 }
 
 /** Edit a task's basics. Setting a monthly repeat remembers the day of month (see nextDue). */
 export async function updateTask(
   id: string,
-  data: { title?: string; description?: string | null; priority?: string; dueOn?: string | null; recurrence?: string | null; weeklyFocus?: boolean; claudePrompt?: string | null; areaId?: string | null; xp?: number },
+  data: { title?: string; description?: string | null; priority?: string; dueOn?: string | null; dueTime?: string | null; recurrence?: string | null; weeklyFocus?: boolean; claudePrompt?: string | null; areaId?: string | null; xp?: number },
 ) {
-  const current = await db.task.findUnique({ where: { id }, select: { dueOn: true, recurrence: true, meta: true } });
+  const current = await db.task.findUnique({ where: { id }, select: { dueOn: true, dueTime: true, recurrence: true, meta: true } });
   if (!current) throw new Error("Task not found");
   const due = data.dueOn === undefined ? (current.dueOn ? fromDbDate(current.dueOn) : null) : data.dueOn;
   const recurrence = data.recurrence === undefined ? current.recurrence : data.recurrence;
   if (recurrence && !due) throw new Error("A repeating task needs a due date. Set one first.");
+  // Clearing the date clears the reminder time with it; setting a time needs a date.
+  if (data.dueOn === null) data = { ...data, dueTime: null };
+  const time = data.dueTime === undefined ? current.dueTime : data.dueTime;
+  if (time && !due) throw new Error("Set a date before a reminder time.");
+  const timing = data.dueOn !== undefined || data.dueTime !== undefined ? reminderFor(due, time) : {};
   const meta: Record<string, unknown> = { ...((current.meta as Prisma.JsonObject | null) ?? {}) };
   if (recurrence === "monthly" && due && (data.recurrence !== undefined || data.dueOn !== undefined)) meta.monthDay = Number(due.slice(8, 10));
   return db.task.update({
     where: { id },
-    data: { ...data, dueOn: data.dueOn === undefined ? undefined : data.dueOn === null ? null : toDbDate(data.dueOn), meta: meta as Prisma.InputJsonObject },
+    data: { ...data, ...timing, dueOn: data.dueOn === undefined ? undefined : data.dueOn === null ? null : toDbDate(data.dueOn), meta: meta as Prisma.InputJsonObject },
   });
 }
 
@@ -243,6 +257,7 @@ export async function createTask(input: {
   areaId?: string;
   priority: string;
   dueOn?: string;
+  dueTime?: string;
   recurrence?: string;
 }) {
   return db.$transaction(async (tx) => {
@@ -275,6 +290,8 @@ export async function createTask(input: {
         areaId: input.areaId,
         priority: input.priority,
         dueOn: input.dueOn ? toDbDate(input.dueOn) : undefined,
+        dueTime: input.dueOn ? input.dueTime : undefined,
+        ...reminderFor(input.dueOn, input.dueTime),
         recurrence: input.kind === "habit" ? input.recurrence ?? "daily" : input.recurrence ?? null,
         meta: input.recurrence === "monthly" && input.dueOn ? { monthDay: Number(input.dueOn.slice(8, 10)) } : {},
         status,
@@ -332,6 +349,7 @@ const itemSelect = {
   kind: true,
   priority: true,
   dueOn: true,
+  dueTime: true,
   recurrence: true,
   parent: { select: { id: true, title: true } },
   area: { select: { name: true } },
@@ -343,6 +361,7 @@ export type TodayItem = {
   kind: string;
   priority: string;
   dueOn: string | null;
+  dueTime: string | null;
   recurrence: string | null;
   parent: { id: string; title: string } | null;
   areaName: string | null;
@@ -354,6 +373,7 @@ const toItem = (t: Prisma.TaskGetPayload<{ select: typeof itemSelect }>): TodayI
   kind: t.kind,
   priority: t.priority,
   dueOn: t.dueOn ? fromDbDate(t.dueOn) : null,
+  dueTime: t.dueTime,
   recurrence: t.recurrence,
   parent: t.parent,
   areaName: t.area?.name ?? null,
@@ -361,6 +381,9 @@ const toItem = (t: Prisma.TaskGetPayload<{ select: typeof itemSelect }>): TodayI
 
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 const byPriority = (a: TodayItem, b: TodayItem) => (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2);
+/** Timed items first, in clock order; untimed after, by priority. */
+const byTimeThenPriority = (a: TodayItem, b: TodayItem) =>
+  a.dueTime && b.dueTime ? a.dueTime.localeCompare(b.dueTime) : a.dueTime ? -1 : b.dueTime ? 1 : byPriority(a, b);
 
 /**
  * Today = everything that needs attention, in the order an ADHD brain needs it:
@@ -408,7 +431,7 @@ export async function getToday() {
   return {
     today,
     overdue: overdue.map(toItem),
-    dueToday: dueToday.map(toItem).sort(byPriority),
+    dueToday: dueToday.map(toItem).sort(byTimeThenPriority),
     upcoming: upcoming.map(toItem),
     inbox: inbox.map(toItem),
     done,
@@ -460,4 +483,25 @@ export async function getAllOpen() {
     take: 500,
   });
   return { today: todayISO(), items: rows.map(toItem) };
+}
+
+// ── Reminders (used by the worker and notification actions) ─────────────────
+
+/** Push a reminder later (notification "Snooze" button). Re-arms it. */
+export async function snoozeTask(id: string, minutes: number) {
+  return db.task.update({ where: { id }, data: { remindAt: new Date(Date.now() + minutes * 60_000), remindedAt: null } });
+}
+
+/** Reminders that are due and not yet sent, for open tasks only. */
+export async function dueReminders(now = new Date()) {
+  return db.task.findMany({
+    where: { remindAt: { lte: now }, remindedAt: null, archivedAt: null, status: { notIn: [...CLOSED] } },
+    orderBy: { remindAt: "asc" },
+    select: { id: true, title: true, priority: true, recurrence: true, dueTime: true, parent: { select: { title: true } } },
+    take: 50,
+  });
+}
+
+export async function markReminded(ids: string[], at = new Date()) {
+  if (ids.length) await db.task.updateMany({ where: { id: { in: ids } }, data: { remindedAt: at } });
 }

@@ -54,7 +54,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           )}
         </div>
         {t.description && <p className="mt-4 whitespace-pre-wrap text-fg-muted">{t.description}</p>}
-        {t.kind !== "habit" && <TaskEdit id={t.id} dueOn={t.dueOn ? fromDbDate(t.dueOn) : null} recurrence={t.recurrence} priority={t.priority} backHref={back.href} />}
+        {t.kind !== "habit" && <TaskEdit id={t.id} dueOn={t.dueOn ? fromDbDate(t.dueOn) : null} dueTime={t.dueTime} recurrence={t.recurrence} priority={t.priority} backHref={back.href} />}
       </header>
 
       {(t.kind === "quest" || t.steps.length > 0) && (

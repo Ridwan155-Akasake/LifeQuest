@@ -36,6 +36,7 @@ export type Tone = (typeof TONES)[number];
 export const id = z.string().min(1).max(64);
 export const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 export const recurrence = z.string().regex(RECURRENCE_RE, "Unknown repeat rule");
+export const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24h)");
 
 export const createTaskInput = z.object({
   title: z.string().trim().min(1, "Give it a title").max(200),
@@ -46,6 +47,7 @@ export const createTaskInput = z.object({
   areaId: id.optional(),
   priority: z.enum(PRIORITIES).default("medium"),
   dueOn: day.optional(),
+  dueTime: clock.optional(),
   recurrence: recurrence.optional(),
 });
 export type CreateTaskInput = z.input<typeof createTaskInput>;
@@ -56,6 +58,7 @@ export const updateTaskInput = z.object({
   priority: z.enum(PRIORITIES).optional(),
   areaId: id.nullable().optional(),
   dueOn: day.nullable().optional(),
+  dueTime: clock.nullable().optional(),
   recurrence: recurrence.nullable().optional(),
   weeklyFocus: z.boolean().optional(),
   claudePrompt: z.string().max(4000).nullable().optional(),

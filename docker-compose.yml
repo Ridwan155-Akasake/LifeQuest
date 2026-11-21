@@ -1,7 +1,7 @@
 # HQ (hq.ridwansharif.com) — self-hosted stack on the Kali homelab.
 # Fully separate from ARCNIR: own Postgres, own volumes, own networks, own tunnel.
 #
-#   docker compose up -d --build                  # db + migrate + web + backup
+#   docker compose up -d --build                  # db + migrate + web + ticker + backup
 #   docker compose run --rm tools npm run db:seed # one-off jobs (see README.md)
 #   docker compose --profile tunnel up -d         # add Cloudflare Tunnel once the token exists
 
@@ -51,13 +51,35 @@ services:
       OWNER_SESSION_SECRET: ${OWNER_SESSION_SECRET:?}
       APP_TIMEZONE: ${APP_TIMEZONE:-America/Chicago}
       NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3100}
+      APP_URL: ${APP_URL:-http://localhost:3100}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # Notifications
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@ridwansharif.com}
+      CRON_SECRET: ${CRON_SECRET:?generate with openssl rand -hex 24}
+      DIGEST_TIME: ${DIGEST_TIME:-08:00}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     # LAN/localhost access for testing. Default binds to the server itself only.
     ports:
       - "${WEB_BIND:-127.0.0.1}:3100:3000"
     depends_on:
       migrate: { condition: service_completed_successfully }
     networks: [backend, edge]
+
+  # Pokes /api/cron/tick every minute → due reminders + morning digest (deploy/ticker.mjs).
+  ticker:
+    image: node:22-bookworm-slim
+    restart: unless-stopped
+    command: ["node", "/ticker.mjs"]
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    volumes:
+      - ./deploy/ticker.mjs:/ticker.mjs:ro
+    depends_on:
+      web: { condition: service_healthy }
+    networks: [backend]
 
   backup:
     image: postgres:18

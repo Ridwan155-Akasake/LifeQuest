@@ -29,6 +29,7 @@ flowchart LR
 | `db` | Postgres 18. Data in `./data/postgres`. No published port; only other containers can reach it. |
 | `migrate` | Applies database migrations, then exits. `web` waits for it. |
 | `web` | The app on port 3000 inside Docker, published as `3100` on the host. |
+| `ticker` | Pokes HQ every minute so due reminders and the morning digest get sent. |
 | `backup` | One `pg_dump` at startup, then nightly at `BACKUP_HOUR`, into `./backups`, kept `BACKUP_KEEP_DAYS` days. |
 | `tools` | One-off jobs (`docker compose run --rm tools …`). Not started by `up`. |
 | `cloudflared` | Public HTTPS via Cloudflare Tunnel. Only with `--profile tunnel`. |
@@ -45,6 +46,11 @@ flowchart LR
    - `OWNER_PASSWORD_*` / `OWNER_SESSION_SECRET`: generate on any machine with Node, from `web/`:
      `npm run hash-password -- "your password"`, then paste the 3 lines into `.env`.
    - `LIFEQUEST_VAULT_HOST`: absolute path to the Syncthing copy of the LifeQuest vault on the server.
+   - `CRON_SECRET`: `openssl rand -hex 24`.
+   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: from `web/`, run `npm run vapid` **once**. Regenerating
+     them later silently breaks every phone's notifications.
+   - Optional Telegram fallback: `TELEGRAM_BOT_TOKEN` (the SecondBrain bot's token) and
+     `TELEGRAM_CHAT_ID` (your Telegram user id). Only used when no device receives a reminder.
    - To test from another device on your LAN before the tunnel exists, set `WEB_BIND=0.0.0.0` and
      `COOKIE_SECURE=false`.
 
@@ -73,6 +79,17 @@ flowchart LR
    `--apply` writes `lq_id:` into each quest file and backs up the originals to `./vault-backups/` first.
 
 7. **Open it:** `http://<server-ip>:3100` (LAN) or `http://localhost:3100` on the server.
+
+## Notifications (needs the public HTTPS URL)
+
+Push notifications only work over HTTPS, so do this after the tunnel is live:
+1. On your Android phone open `https://hq.ridwansharif.com` in Chrome, sign in.
+2. Chrome menu ⋮ → **Install app**. Open HQ from the new icon.
+3. **Settings → Turn on notifications**, then **Send test notification**.
+
+Tasks with a time ("call dentist at 3pm", "check oven in 20 min") ping at that time with
+**Done** and **Snooze 1h** buttons. The morning summary arrives at `DIGEST_TIME`.
+Check delivery with `docker compose logs ticker`.
 
 ## Backups and restore
 

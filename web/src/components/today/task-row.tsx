@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import { setTaskDoneAction, updateTaskAction } from "@/lib/actions";
-import { addDays, recurrenceLabel, relativeDue } from "@/lib/dates";
+import { addDays, formatClock, recurrenceLabel, relativeDue } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import type { TodayItem } from "@/lib/work";
 
@@ -73,7 +73,12 @@ export function TaskRow({ item, today, showSchedule }: { item: TodayItem; today:
               ↻
             </span>
           )}
-          {due && <span className={due.tone === "stop" ? "text-stop" : due.tone === "warn" ? "text-warn" : "text-fg-faint"}>{due.label}</span>}
+          {due && (
+            <span className={due.tone === "stop" ? "text-stop" : due.tone === "warn" ? "text-warn" : "text-fg-faint"}>
+              {due.label}
+              {item.dueTime && ` ${formatClock(item.dueTime)}`}
+            </span>
+          )}
         </span>
       </div>
       {showSchedule && !note && (
