@@ -160,7 +160,9 @@ Move one job at a time, both running side by side, switch off in the bot only on
 
 Two directions: tasks with a date/time **create events** in the calendar, and calendar events
 **show up in HQ** (Today + All tasks). Bot's PLAN-notify-reminders.md Phase 4 already sketched
-Google Calendar via OAuth refresh token (no recurring cost). Open: which calendar/account.
+Google Calendar via OAuth refresh token (no recurring cost). **Accounts: BOTH Google accounts
+(personal + ARCNIR)** — pull events from both; HQ writes new events into one chosen account
+(default to be confirmed when building).
 
 ## 7. Homelab deployment (on Kali, guide first; nothing runs until you say go)
 

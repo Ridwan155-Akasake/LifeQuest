@@ -25,7 +25,7 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 - Name HQ, hq.ridwansharif.com, "early version of LifeQuest".
 - Phone: Android + website now, iPhone later. Widgets need native wrapper (Android free/sideload; iOS = Mac + $99/yr → user's call later).
 - SecondBrain bot (`L:\SecondBrain\secondbrain-bot`, Python on Kali): HQ takes over ALL jobs (Claude agent, Inbox capture, reminders, approvals); bot = thin backup. Migrate one job at a time, side by side. Mapping in PLAN §6b.
-- Calendar: user wants HQ ⇄ calendar both ways (create events + import events). Which calendar/account NOT confirmed yet. PLAN §6c.
+- Calendar: user wants HQ ⇄ calendar both ways (create events + import events). Accounts: BOTH Google (personal + ARCNIR); pull from both, write to one (which = confirm at build). PLAN §6c.
 - Order: deploy + notifications first.
 
 ## Key files (web/)
@@ -47,6 +47,6 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 1. User: create private GitHub repo `hq` → push.
 2. Kali deploy (README "First deploy"; guide-first, user runs). Needs .env: POSTGRES_PASSWORD, OWNER_*, CRON_SECRET, VAPID (npm run vapid ONCE), optional TELEGRAM_BOT_TOKEN/CHAT_ID. First real compose up → expect fixes.
 3. DNS ridwansharif.com → Cloudflare (re-add portfolio Vercel records) + tunnel hostname hq. → phone install + notifications. Confirm with user before DNS.
-4. Calendar: ask which calendar/account; plan OAuth (Google free) both directions.
+4. Calendar: both Google accounts; OAuth (free) both directions; ask which account receives new events.
 5. Bot takeover per PLAN §6b, one job at a time (Claude page needs Cloudflare Access first).
 6. Android wrapper + widget.
