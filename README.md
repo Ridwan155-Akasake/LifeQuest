@@ -36,7 +36,11 @@ flowchart LR
 
 ## First deploy (Kali server)
 
-1. **Clone** the repo on the server and `cd` into it.
+1. **Clone** the repo (GitHub: `LifeQuest`) into `~/hq`, **not** `~/LifeQuest` — that folder is the
+   Obsidian vault the Telegram bot mounts:
+   ```bash
+   git clone https://github.com/Ridwan155-Akasake/LifeQuest.git ~/hq && cd ~/hq
+   ```
 
 2. **Create `.env`** from the example:
    ```bash

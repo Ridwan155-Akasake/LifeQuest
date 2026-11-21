@@ -166,7 +166,7 @@ Google Calendar via OAuth refresh token (no recurring cost). **Accounts: BOTH Go
 
 ## 7. Homelab deployment (on Kali, guide first; nothing runs until you say go)
 
-Planned stack, in its own folder on the server (e.g. `~/hq/`, cloned from the new repo):
+Planned stack, in its own folder on the server (`~/hq/` — NOT `~/LifeQuest`, which is the vault — cloned from the new repo):
 
 | Service | Image | Notes |
 |---|---|---|

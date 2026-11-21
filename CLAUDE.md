@@ -5,7 +5,7 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 ## Overview
 - Kanban + quests from LifeQuest vault, habits, daily logs, streaks/XP, personal CRM, job-hunt board.
 - Cherry-picked from ARCNIR site zip (`arcnir-site-main.zip` here) → work module (task-board, WorkflowNode.category, subtasks, labels, TaskActivity) + Leads/Clients → CRM. Dropped RBAC/delegation/invoices/signatures/etc.
-- Stakeholder: Ridwan only. User pushes; Claude never pushes. Git repo at project root (branch main, init 2026-11-21, no remote yet). `.gitattributes` forces LF (deploys to Linux). Zip + data/ + backups/ + .env gitignored.
+- Stakeholder: Ridwan only. User pushes; Claude never pushes. Git repo at project root (branch main). GitHub repo name = `LifeQuest` (Ridwan155-Akasake, user creating 2026-11-21); app name stays HQ. On Kali clone to `~/hq` — `~/LifeQuest` is the vault (bot mount), never clone over it. `.gitattributes` forces LF (deploys to Linux). Zip + data/ + backups/ + .env gitignored.
 
 ## Decisions (2026-10-06)
 - (2026-11-21, supersedes earlier) Own git repo + fully self-hosted on Kali homelab: Compose stack web+postgres:18+backup+cloudflared+vault-sync. Own Postgres, NOT ARCNIR's DB platform/hosting. No Vercel, no Neon. Prisma unchanged.
@@ -44,7 +44,7 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 - Gotchas: PGlite URL needs `&pgbouncer=true&connection_limit=1`. Bash heredocs mangle `\` → write scripts to scratchpad, `python -I file`. TaskStop leaves npx child node alive → kill by port (Get-NetTCPConnection) after tests.
 
 ## Next steps
-1. User: create private GitHub repo `hq` → push.
+1. User: create private GitHub repo `LifeQuest` → push.
 2. Kali deploy (README "First deploy"; guide-first, user runs). Needs .env: POSTGRES_PASSWORD, OWNER_*, CRON_SECRET, VAPID (npm run vapid ONCE), optional TELEGRAM_BOT_TOKEN/CHAT_ID. First real compose up → expect fixes.
 3. DNS ridwansharif.com → Cloudflare (re-add portfolio Vercel records) + tunnel hostname hq. → phone install + notifications. Confirm with user before DNS.
 4. Calendar: both Google accounts; OAuth (free) both directions; ask which account receives new events.
