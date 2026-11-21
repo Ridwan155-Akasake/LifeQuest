@@ -21,3 +21,6 @@ arcnir-site-main.zip
 
 # Local doc backups
 *.bak-*
+
+# graphify knowledge-graph cache
+graphify-out/

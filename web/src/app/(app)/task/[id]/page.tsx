@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 
 import { CheckToggle, CopyButton } from "@/components/today/toggles";
 import { Chip, DueLabel, PriorityBadge, Progress } from "@/components/ui/badges";
-import { fromDbDate, todayISO } from "@/lib/dates";
+import { fromDbDate, recurrenceLabel, todayISO } from "@/lib/dates";
 import { CATEGORY_LABEL, isClosed, type Category } from "@/lib/domain";
 import { getTask } from "@/lib/work";
 import { AddStep } from "./add-step";
+import { TaskEdit } from "./task-edit";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const t = await getTask((await params).id);
@@ -45,7 +46,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <div className="mt-2 flex flex-wrap items-center gap-4">
           <PriorityBadge priority={t.priority} />
           {t.dueOn && <DueLabel dueOn={fromDbDate(t.dueOn)} today={today} closed={closed} />}
-          <span className="font-mono text-[11px] text-fg-faint">{t.xp} XP</span>
+          {t.recurrence && <span className="font-mono text-[11px] text-info">↻ {recurrenceLabel(t.recurrence)}</span>}
           {t.vaultPath && (
             <span className="truncate font-mono text-[11px] text-fg-faint" title="LifeQuest vault source">
               ⇄ {t.vaultPath}
@@ -53,6 +54,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           )}
         </div>
         {t.description && <p className="mt-4 whitespace-pre-wrap text-fg-muted">{t.description}</p>}
+        {t.kind !== "habit" && <TaskEdit id={t.id} dueOn={t.dueOn ? fromDbDate(t.dueOn) : null} recurrence={t.recurrence} priority={t.priority} backHref={back.href} />}
       </header>
 
       {(t.kind === "quest" || t.steps.length > 0) && (

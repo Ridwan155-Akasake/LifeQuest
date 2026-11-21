@@ -1,130 +1,121 @@
-import Link from "next/link";
-
 import { CheckToggle } from "@/components/today/toggles";
 import { AddHabit } from "@/components/today/add-habit";
-import { DueLabel, Progress } from "@/components/ui/badges";
+import { TaskRow } from "@/components/today/task-row";
+import { DueLabel } from "@/components/ui/badges";
+import { recurrenceLabel } from "@/lib/dates";
 import { cn } from "@/lib/cn";
-import { getToday } from "@/lib/work";
+import { getToday, type TodayItem } from "@/lib/work";
 
 export const metadata = { title: "Today" };
 
-const RECURRENCE_LABEL: Record<string, string> = { daily: "Every day", weekdays: "Weekdays" };
-
-/** Today — the daily home screen: stats, the one thing, focus quests, due, habits, follow-ups. */
+/**
+ * Today — the one screen to check. Order matters for an ADHD brain: what's already late,
+ * what's due now, what's been dumped in the inbox and needs a date, then a peek at the week.
+ * Habits sit on the side; "done today" sits at the bottom as proof of progress.
+ */
 export default async function TodayPage() {
   const d = await getToday();
-  const habitsDue = d.habits.filter((h) => h.dueToday);
-  const habitsDone = habitsDue.filter((h) => h.doneToday).length;
   const dateLabel = new Date(`${d.today}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+  const habitsDue = d.habits.filter((h) => h.dueToday);
+  const nowCount = d.overdue.length + d.dueToday.length;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-widest text-fg-faint">{dateLabel}</p>
-        <h1 className="mt-1 text-3xl font-semibold">{d.todayLog?.oneThing ? d.todayLog.oneThing : "What's the one thing today?"}</h1>
-        {d.todayLog?.oneWord && <p className="mt-1 text-fg-muted">Word of the day: {d.todayLog.oneWord}</p>}
+        <h1 className="mt-1 text-3xl font-semibold">{nowCount === 0 ? "Nothing urgent. Breathe." : `${nowCount} thing${nowCount === 1 ? "" : "s"} need${nowCount === 1 ? "s" : ""} you today`}</h1>
+        <p className="mt-1 font-mono text-[11px] text-fg-faint">
+          {d.overdue.length} overdue · {d.dueToday.length} today · {d.inbox.length} in inbox · {d.done.length} done today
+        </p>
       </header>
 
-      {/* Stats — level/XP/streak are recomputed from the Activity ledger on every load. */}
-      <section aria-label="Progress" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Level" value={String(d.stats.level)}>
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-line">
-            <div className="h-full bg-accent" style={{ width: `${Math.round((d.stats.intoLevel / d.stats.levelSpan) * 100)}%` }} />
-          </div>
-          <p className="mt-1 font-mono text-[10px] text-fg-faint">{d.stats.toNext} XP to L{d.stats.level + 1}</p>
-        </Stat>
-        <Stat label="Total XP" value={d.stats.totalXp.toLocaleString()} sub={`+${d.stats.xpToday} today`} />
-        <Stat label="Streak" value={`${d.stats.current}d`} sub={d.stats.aliveToday ? "🔥 alive today" : d.stats.current ? "Do one thing to keep it" : "Start one today"} />
-        <Stat label="Habits" value={`${habitsDone}/${habitsDue.length}`} sub="due today" />
-      </section>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-8">
-          <Panel title="Weekly focus" empty="No focus quests. Star a quest (weekly_focus: true in the vault) to pin it here.">
-            {d.focus.map((q) => (
-              <li key={q.id}>
-                <Link href={`/task/${q.id}`} className="block rounded-btn border border-line bg-base-2 p-3 transition hover:border-line-strong">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-medium">{q.title}</span>
-                    {q.areaName && <span className="shrink-0 font-mono text-[11px] text-fg-faint">{q.areaName}</span>}
-                  </div>
-                  {q.stepCount > 0 && (
-                    <div className="mt-2">
-                      <Progress done={q.stepDone} total={q.stepCount} />
+          {d.overdue.length > 0 && <Section title="Overdue" tone="stop" items={d.overdue} today={d.today} />}
+          <Section title="Today" items={d.dueToday} today={d.today} empty="Nothing due today." />
+          <Section title="Inbox" hint="No date yet. Give each one a day." items={d.inbox} today={d.today} schedule empty="Inbox zero. Anything new goes in the box above." />
+          <Section title="Next 7 days" items={d.upcoming} today={d.today} empty="Clear week ahead." muted />
+        </div>
+
+        <aside className="flex min-w-0 flex-col gap-8">
+          <section>
+            <h2 className="mb-3 flex items-baseline justify-between text-lg font-semibold">
+              Habits <span className="font-mono text-[11px] font-normal text-fg-faint">{habitsDue.filter((h) => h.doneToday).length}/{habitsDue.length} today</span>
+            </h2>
+            {d.habits.length === 0 ? (
+              <p className="text-sm text-fg-faint">No habits yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {d.habits.map((h) => (
+                  <li key={h.id} className={cn("rounded-btn border border-line bg-base-2 px-3 py-2", !h.dueToday && "opacity-50")}>
+                    <div className="flex items-center gap-3">
+                      {h.dueToday ? <CheckToggle id={h.id} kind="habit" checked={h.doneToday} label={h.title} xp={h.xp} /> : <span className="h-5 w-5" />}
+                      <span className="min-w-0 flex-1 truncate">{h.title}</span>
+                      <span className="flex gap-0.5" aria-label="Last 7 days">
+                        {h.last7.map((x) => (
+                          <span key={x.day} title={x.day} className={cn("h-2.5 w-2.5 rounded-sm", x.done ? "bg-live" : x.due ? "bg-line-strong" : "bg-line")} />
+                        ))}
+                      </span>
                     </div>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </Panel>
+                    <p className="mt-0.5 pl-8 font-mono text-[10px] text-fg-faint">{recurrenceLabel(h.recurrence ?? "daily")}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <AddHabit />
+          </section>
 
-          <Panel title="Due & overdue" empty="Nothing due. Nice.">
-            {d.due.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 rounded-btn border border-line bg-base-2 px-3 py-2">
-                <Link href={`/task/${t.quest?.id ?? t.id}`} className="min-w-0 hover:text-accent">
-                  <span className="block truncate">{t.title}</span>
-                  {t.quest && <span className="block truncate font-mono text-[11px] text-fg-faint">{t.quest.title}</span>}
-                </Link>
-                <DueLabel dueOn={t.dueOn} today={d.today} />
-              </li>
-            ))}
-          </Panel>
-        </div>
+          {d.followUps.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold">Follow up with</h2>
+              <ul className="flex flex-col gap-2">
+                {d.followUps.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 rounded-btn border border-line bg-base-2 px-3 py-2">
+                    <span className="min-w-0 truncate">
+                      {c.name}
+                      {c.company && <span className="text-fg-faint"> · {c.company}</span>}
+                    </span>
+                    <DueLabel dueOn={c.nextFollowUpOn} today={d.today} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-        <div className="flex min-w-0 flex-col gap-8">
-          <Panel title="Habits" empty="No habits yet — add one below." footer={<AddHabit />}>
-            {d.habits.map((h) => (
-              <li key={h.id} className={cn("rounded-btn border border-line bg-base-2 px-3 py-2", !h.dueToday && "opacity-50")}>
-                <div className="flex items-center gap-3">
-                  {h.dueToday ? <CheckToggle id={h.id} kind="habit" checked={h.doneToday} label={h.title} xp={h.xp} /> : <span className="h-5 w-5" />}
-                  <span className="min-w-0 flex-1 truncate">{h.title}</span>
-                  <span className="flex gap-0.5" aria-label="Last 7 days">
-                    {h.last7.map((x) => (
-                      <span key={x.day} title={x.day} className={cn("h-2.5 w-2.5 rounded-sm", x.done ? "bg-live" : x.due ? "bg-line-strong" : "bg-line")} />
-                    ))}
-                  </span>
-                </div>
-                <p className="mt-0.5 pl-8 font-mono text-[10px] text-fg-faint">
-                  {RECURRENCE_LABEL[h.recurrence ?? "daily"] ?? h.recurrence?.replace("weekly:", "")} · +{h.xp} XP
-                </p>
-              </li>
-            ))}
-          </Panel>
-
-          <Panel title="Follow up with" empty="No follow-ups due.">
-            {d.followUps.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-3 rounded-btn border border-line bg-base-2 px-3 py-2">
-                <span className="min-w-0 truncate">
-                  {c.name}
-                  {c.company && <span className="text-fg-faint"> · {c.company}</span>}
-                </span>
-                <DueLabel dueOn={c.nextFollowUpOn} today={d.today} />
-              </li>
-            ))}
-          </Panel>
-        </div>
+          {d.done.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-lg font-semibold text-live">Done today ✓</h2>
+              <ul className="flex flex-col gap-1">
+                {d.done.map((t) => (
+                  <li key={t.id} className="truncate text-sm text-fg-muted">
+                    ✓ {t.title}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </aside>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, sub, children }: { label: string; value: string; sub?: string; children?: React.ReactNode }) {
+function Section({ title, hint, items, today, empty, tone, schedule, muted }: { title: string; hint?: string; items: TodayItem[]; today: string; empty?: string; tone?: "stop"; schedule?: boolean; muted?: boolean }) {
   return (
-    <div className="rounded-card border border-line bg-base-2 p-4">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-fg-faint">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
-      {sub && <p className="mt-0.5 font-mono text-[10px] text-fg-faint">{sub}</p>}
-      {children}
-    </div>
-  );
-}
-
-function Panel({ title, empty, children, footer }: { title: string; empty: string; children: React.ReactNode[]; footer?: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-3 text-lg font-semibold">{title}</h2>
-      {children.length ? <ul className="flex flex-col gap-2">{children}</ul> : <p className="text-sm text-fg-faint">{empty}</p>}
-      {footer}
+    <section className={cn(muted && "opacity-80")}>
+      <h2 className={cn("mb-1 flex items-baseline gap-2 text-lg font-semibold", tone === "stop" && "text-stop")}>
+        {title} <span className="font-mono text-[11px] font-normal text-fg-faint">{items.length}</span>
+      </h2>
+      {hint && items.length > 0 && <p className="mb-2 text-xs text-fg-faint">{hint}</p>}
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm text-fg-faint">{empty}</p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-2">
+          {items.map((t) => (
+            <TaskRow key={t.id} item={t} today={today} showSchedule={schedule} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

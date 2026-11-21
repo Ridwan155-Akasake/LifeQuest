@@ -1,8 +1,24 @@
 # Personal Productivity System — Plan
 
-> One place to run my life: LifeQuest campaigns/quests as a kanban, habits, daily logs,
-> streaks/XP, a personal CRM, and a job-hunt pipeline. Lives on a subdomain of
-> ridwansharif.com (name TBD — set via `NEXT_PUBLIC_APP_URL`).
+> **A simple task tracker so my ADHD brain doesn't forget what I assigned myself.**
+> Capture in seconds, see what's due, get reminded. Self-hosted on the homelab, on a
+> subdomain of ridwansharif.com (name TBD).
+
+## Scope change (2026-11-21): simple tracker first
+
+The original plan (below) grew into a full LifeQuest app. That's parked. v1 is a plain,
+fast task tracker. The database is already LifeQuest-shaped, so it can grow into that later
+without a rewrite.
+
+| In v1 | Parked (code/data kept, hidden or not built) |
+|---|---|
+| Quick capture box on every page ("pay rent every month 12/1 !") | XP / levels / streak stats |
+| Today: Overdue → Today → Inbox → Next 7 days, Done today | Job-hunt board (hidden from menu) |
+| Repeating tasks: daily / weekdays / weekly / monthly, roll forward on completion | CRM pages, daily-log pages |
+| All tasks page (nothing out of sight) | Vault write-back, AI quests, multi-user |
+| Habits with 7-day dots | Arcnir-style column management (still on Quests board) |
+| Quests board + LifeQuest vault import (kept, it's already built) | |
+| **Telegram reminders** (next) | |
 
 Decided 2026-10-06:
 
@@ -109,18 +125,16 @@ The full schema is in `web/prisma/schema.prisma`. Key ideas:
    frontmatter status in the vault files for quests whose `vaultHash` changed. It never deletes files.
 3. The Telegram bot / headless Claude keeps writing new quest files, and the next import picks them up.
 
-## 6. Phases
+## 6. Phases (simple-tracker scope)
 
-| Phase | Deliverable | Status |
+| Step | Deliverable | Status |
 |---|---|---|
-| **0 — Foundation** | App scaffold, schema, owner login, app shell, theme | ✅ built 2026-10-06 |
-| **1 — Quest board** | Kanban (from Arcnir), quest/step detail, vault import | ✅ built, needs real DB |
-| **2 — Today + habits + XP** | Today page: weekly focus, due, habits checklist, streak, level | ✅ built 2026-10-06 |
-| 3 — Daily logs | Morning/evening log form, history, mood/energy chart | ⬜ |
-| 4 — Personal CRM | Contacts, interaction log, follow-up queue on Today | ⬜ |
-| 5 — Job hunt | `jobs` board linked to contacts | ⬜ |
-| 6 — Vault export + deploy | Write-back sync; Dockerfile + Compose (web, postgres, backup, vault-sync); Cloudflare Tunnel + subdomain | ⬜ |
-| 7 — Extras | PWA, calendar, Telegram reminders, AI quest generator, portfolio "now" widget | ⬜ |
+| 1 | Foundation: login, shell, schema, Quests board, Today, habits, vault import | ✅ 2026-10-06 |
+| 2 | Docker stack + own git repo | ✅ 2026-11-21 (not yet run on Kali) |
+| 3 | Quick capture, Inbox, repeating tasks, trimmed Today, All tasks, task edit | ✅ 2026-11-21 |
+| 4 | Telegram reminders: morning list + due pings (reuse SecondBrain bot) | ⬜ next |
+| 5 | Deploy on Kali + tunnel/subdomain | ⬜ |
+| later | Parked LifeQuest features (see table above) if still wanted after a month of daily use | ⬜ |
 
 ## 7. Homelab deployment (on Kali, guide first; nothing runs until you say go)
 

@@ -2,9 +2,9 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 
 import { db } from "./db";
-import { addDays, fromDbDate, habitDueOn, todayISO, toDbDate } from "./dates";
+import { addDays, fromDbDate, habitDueOn, nextDue, todayISO, toDbDate } from "./dates";
+import { parseCapture } from "./capture";
 import { CLOSED, DEFAULT_XP, isClosed, type Category, type TaskKind } from "./domain";
-import { levelFor, streakFor } from "./xp";
 
 /**
  * Work service — the one place that changes tasks, so status, completedAt and the XP
@@ -166,12 +166,54 @@ export async function moveTask(id: string, columnId: string, index?: number) {
   });
 }
 
-/** Tick / untick a quest step (steps live outside columns). */
-export async function setStepDone(id: string, done: boolean) {
+/**
+ * Tick / untick any task or quest step. A REPEATING task never closes: completing it logs
+ * the completion (+xp) and moves its due date to the next occurrence, so "pay rent
+ * monthly" is always waiting for next month. Returns the new due date when it rolled.
+ */
+export async function setTaskDone(id: string, done: boolean): Promise<{ nextDue?: string }> {
   return db.$transaction(async (tx) => {
-    const step = await tx.task.findUnique({ where: { id }, select: { id: true, status: true, xp: true, kind: true } });
-    if (!step) throw new Error("Step not found");
-    await applyStatus(tx, step, done ? "done" : "todo");
+    const t = await tx.task.findUnique({ where: { id }, select: { id: true, status: true, xp: true, kind: true, recurrence: true, dueOn: true, meta: true } });
+    if (!t) throw new Error("Task not found");
+    if (done && t.recurrence && t.kind !== "habit") {
+      const today = todayISO();
+      const from = t.dueOn ? fromDbDate(t.dueOn) : today;
+      const monthDay = (t.meta as { monthDay?: unknown } | null)?.monthDay;
+      const next = nextDue(t.recurrence, from, today, typeof monthDay === "number" ? monthDay : undefined);
+      await tx.task.update({ where: { id }, data: { dueOn: toDbDate(next), status: "todo", completedAt: null } });
+      await tx.activity.create({ data: { taskId: id, type: "task.completed", xp: t.xp, on: toDbDate(today), data: { kind: t.kind, repeat: true, was: from, next } } });
+      return { nextDue: next };
+    }
+    await applyStatus(tx, t, done ? "done" : "todo");
+    return {};
+  });
+}
+
+/** Kept for callers from the quest page. */
+export const setStepDone = setTaskDone;
+
+/** Quick capture: one line of text -> a task (see lib/capture.ts for the syntax). */
+export async function quickCapture(text: string) {
+  const c = parseCapture(text, todayISO());
+  if (!c.title) throw new Error("Type something first");
+  return createTask({ title: c.title.slice(0, 200), kind: "task", priority: c.priority, dueOn: c.dueOn, recurrence: c.recurrence });
+}
+
+/** Edit a task's basics. Setting a monthly repeat remembers the day of month (see nextDue). */
+export async function updateTask(
+  id: string,
+  data: { title?: string; description?: string | null; priority?: string; dueOn?: string | null; recurrence?: string | null; weeklyFocus?: boolean; claudePrompt?: string | null; areaId?: string | null; xp?: number },
+) {
+  const current = await db.task.findUnique({ where: { id }, select: { dueOn: true, recurrence: true, meta: true } });
+  if (!current) throw new Error("Task not found");
+  const due = data.dueOn === undefined ? (current.dueOn ? fromDbDate(current.dueOn) : null) : data.dueOn;
+  const recurrence = data.recurrence === undefined ? current.recurrence : data.recurrence;
+  if (recurrence && !due) throw new Error("A repeating task needs a due date. Set one first.");
+  const meta: Record<string, unknown> = { ...((current.meta as Prisma.JsonObject | null) ?? {}) };
+  if (recurrence === "monthly" && due && (data.recurrence !== undefined || data.dueOn !== undefined)) meta.monthDay = Number(due.slice(8, 10));
+  return db.task.update({
+    where: { id },
+    data: { ...data, dueOn: data.dueOn === undefined ? undefined : data.dueOn === null ? null : toDbDate(data.dueOn), meta: meta as Prisma.InputJsonObject },
   });
 }
 
@@ -233,7 +275,8 @@ export async function createTask(input: {
         areaId: input.areaId,
         priority: input.priority,
         dueOn: input.dueOn ? toDbDate(input.dueOn) : undefined,
-        recurrence: input.kind === "habit" ? input.recurrence ?? "daily" : null,
+        recurrence: input.kind === "habit" ? input.recurrence ?? "daily" : input.recurrence ?? null,
+        meta: input.recurrence === "monthly" && input.dueOn ? { monthDay: Number(input.dueOn.slice(8, 10)) } : {},
         status,
         order: (last?.order ?? -1) + 1,
         xp: DEFAULT_XP[input.kind],
@@ -281,61 +324,94 @@ export async function deleteColumn(id: string) {
   });
 }
 
-// ── Today ────────────────────────────────────────────────────────────────────
+// ── Today (simple tracker) ───────────────────────────────────────────────────
 
+const itemSelect = {
+  id: true,
+  title: true,
+  kind: true,
+  priority: true,
+  dueOn: true,
+  recurrence: true,
+  parent: { select: { id: true, title: true } },
+  area: { select: { name: true } },
+} satisfies Prisma.TaskSelect;
+
+export type TodayItem = {
+  id: string;
+  title: string;
+  kind: string;
+  priority: string;
+  dueOn: string | null;
+  recurrence: string | null;
+  parent: { id: string; title: string } | null;
+  areaName: string | null;
+};
+
+const toItem = (t: Prisma.TaskGetPayload<{ select: typeof itemSelect }>): TodayItem => ({
+  id: t.id,
+  title: t.title,
+  kind: t.kind,
+  priority: t.priority,
+  dueOn: t.dueOn ? fromDbDate(t.dueOn) : null,
+  recurrence: t.recurrence,
+  parent: t.parent,
+  areaName: t.area?.name ?? null,
+});
+
+const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+const byPriority = (a: TodayItem, b: TodayItem) => (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2);
+
+/**
+ * Today = everything that needs attention, in the order an ADHD brain needs it:
+ * overdue → due today → inbox (captured, no date yet) → next 7 days, plus daily habits
+ * and what's already been done today (proof of progress).
+ */
 export async function getToday() {
   const today = todayISO();
   const todayDb = toDbDate(today);
-  const since = toDbDate(addDays(today, -400));
+  const weekDb = toDbDate(addDays(today, 7));
+  const open = { archivedAt: null, kind: { not: "habit" }, status: { notIn: [...CLOSED] } } satisfies Prisma.TaskWhereInput;
 
-  const [focus, due, habits, xpAgg, xpDays, logDays, doneToday, followUps, todayLog] = await Promise.all([
-    db.task.findMany({
-      where: { weeklyFocus: true, parentId: null, archivedAt: null, status: { notIn: [...CLOSED] } },
-      orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
-      select: cardSelect,
-      take: 12,
-    }),
-    db.task.findMany({
-      where: { dueOn: { lte: todayDb }, archivedAt: null, kind: { not: "habit" }, status: { notIn: [...CLOSED] } },
-      orderBy: { dueOn: "asc" },
-      select: { id: true, title: true, kind: true, dueOn: true, parentId: true, parent: { select: { id: true, title: true } } },
-      take: 30,
-    }),
+  const [overdue, dueToday, upcoming, inbox, habits, doneActs, followUps] = await Promise.all([
+    db.task.findMany({ where: { ...open, dueOn: { lt: todayDb } }, orderBy: { dueOn: "asc" }, select: itemSelect, take: 50 }),
+    db.task.findMany({ where: { ...open, dueOn: todayDb }, select: itemSelect, take: 50 }),
+    db.task.findMany({ where: { ...open, dueOn: { gt: todayDb, lte: weekDb } }, orderBy: { dueOn: "asc" }, select: itemSelect, take: 50 }),
+    db.task.findMany({ where: { ...open, kind: "task", dueOn: null, parentId: null, boardId: null }, orderBy: { createdAt: "desc" }, select: itemSelect, take: 50 }),
     db.task.findMany({
       where: { kind: "habit", archivedAt: null },
       orderBy: { order: "asc" },
-      select: { id: true, title: true, recurrence: true, xp: true, area: { select: { name: true } }, habitChecks: { where: { on: { gte: toDbDate(addDays(today, -6)) } }, select: { on: true } } },
+      select: { id: true, title: true, recurrence: true, xp: true, habitChecks: { where: { on: { gte: toDbDate(addDays(today, -6)) } }, select: { on: true } } },
     }),
-    db.activity.aggregate({ _sum: { xp: true } }),
-    db.activity.groupBy({ by: ["on"], where: { on: { gte: since } }, _sum: { xp: true } }),
-    db.dailyLog.findMany({ where: { on: { gte: since } }, select: { on: true } }),
-    db.activity.aggregate({ where: { on: todayDb }, _sum: { xp: true }, _count: { _all: true } }),
+    db.activity.findMany({
+      where: { on: todayDb, type: "task.completed" },
+      orderBy: { createdAt: "desc" },
+      select: { taskId: true, task: { select: { title: true, status: true, recurrence: true } } },
+      take: 100,
+    }),
     db.contact.findMany({
       where: { archivedAt: null, nextFollowUpOn: { lte: todayDb } },
       orderBy: { nextFollowUpOn: "asc" },
       select: { id: true, name: true, company: true, nextFollowUpOn: true },
       take: 10,
     }),
-    db.dailyLog.findUnique({ where: { on: todayDb }, select: { oneThing: true, oneWord: true } }),
   ]);
 
-  const activeDays = new Set<string>([
-    ...xpDays.filter((d) => (d._sum.xp ?? 0) > 0).map((d) => fromDbDate(d.on)),
-    ...logDays.map((d) => fromDbDate(d.on)),
-  ]);
-  const totalXp = Math.max(0, xpAgg._sum.xp ?? 0);
+  // Done today: completions that still stand (a reopened one-off task doesn't count).
+  const seen = new Set<string>();
+  const done = doneActs.flatMap((a) => {
+    if (!a.taskId || !a.task || seen.has(a.taskId)) return [];
+    seen.add(a.taskId);
+    return a.task.status === "done" || a.task.recurrence ? [{ id: a.taskId, title: a.task.title }] : [];
+  });
 
   return {
     today,
-    stats: {
-      totalXp,
-      ...levelFor(totalXp),
-      ...streakFor(activeDays, today),
-      xpToday: doneToday._sum.xp ?? 0,
-    },
-    todayLog,
-    focus: focus.map(toCard),
-    due: due.map((t) => ({ id: t.id, title: t.title, kind: t.kind, dueOn: fromDbDate(t.dueOn!), quest: t.parent })),
+    overdue: overdue.map(toItem),
+    dueToday: dueToday.map(toItem).sort(byPriority),
+    upcoming: upcoming.map(toItem),
+    inbox: inbox.map(toItem),
+    done,
     habits: habits.map((h) => {
       const checked = new Set(h.habitChecks.map((c) => fromDbDate(c.on)));
       return {
@@ -343,7 +419,6 @@ export async function getToday() {
         title: h.title,
         recurrence: h.recurrence,
         xp: h.xp,
-        area: h.area?.name ?? null,
         dueToday: habitDueOn(h.recurrence, today),
         doneToday: checked.has(today),
         last7: Array.from({ length: 7 }, (_, i) => addDays(today, i - 6)).map((d) => ({ day: d, done: checked.has(d), due: habitDueOn(h.recurrence, d) })),
@@ -372,3 +447,17 @@ export async function getTask(id: string) {
 }
 
 export { isClosed };
+
+// ── All tasks (nothing is ever out of sight) ─────────────────────────────────
+
+/** Every open task and quest step, soonest first; undated ones last. */
+export async function getAllOpen() {
+  const rows = await db.task.findMany({
+    // Quest steps only when dated — the undated ones live on their quest page, not here.
+    where: { archivedAt: null, kind: { notIn: ["habit", "quest"] }, status: { notIn: [...CLOSED] }, OR: [{ kind: { not: "step" } }, { dueOn: { not: null } }] },
+    orderBy: [{ dueOn: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    select: itemSelect,
+    take: 500,
+  });
+  return { today: todayISO(), items: rows.map(toItem) };
+}

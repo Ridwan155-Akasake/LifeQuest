@@ -4,6 +4,8 @@
  */
 import { z } from "zod";
 
+import { RECURRENCE_RE } from "./dates";
+
 /** What a column MEANS (ARCNIR WorkflowNode.category). Sets the status of tasks inside it. */
 export const CATEGORIES = ["backlog", "todo", "in-progress", "review", "done", "canceled"] as const;
 export type Category = (typeof CATEGORIES)[number];
@@ -33,6 +35,7 @@ export type Tone = (typeof TONES)[number];
 
 export const id = z.string().min(1).max(64);
 export const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+export const recurrence = z.string().regex(RECURRENCE_RE, "Unknown repeat rule");
 
 export const createTaskInput = z.object({
   title: z.string().trim().min(1, "Give it a title").max(200),
@@ -43,7 +46,7 @@ export const createTaskInput = z.object({
   areaId: id.optional(),
   priority: z.enum(PRIORITIES).default("medium"),
   dueOn: day.optional(),
-  recurrence: z.string().max(40).optional(),
+  recurrence: recurrence.optional(),
 });
 export type CreateTaskInput = z.input<typeof createTaskInput>;
 
@@ -53,6 +56,7 @@ export const updateTaskInput = z.object({
   priority: z.enum(PRIORITIES).optional(),
   areaId: id.nullable().optional(),
   dueOn: day.nullable().optional(),
+  recurrence: recurrence.nullable().optional(),
   weeklyFocus: z.boolean().optional(),
   claudePrompt: z.string().max(4000).nullable().optional(),
   xp: z.number().int().min(0).max(1000).optional(),

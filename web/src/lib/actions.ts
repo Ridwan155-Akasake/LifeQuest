@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { requireOwner } from "./auth";
 import { db } from "./db";
-import { toDbDate } from "./dates";
 import { CATEGORIES, columnInput, createTaskInput, id, updateTaskInput, type Result } from "./domain";
 import * as work from "./work";
 
@@ -35,13 +34,7 @@ export async function createTaskAction(input: unknown) {
 }
 
 export async function updateTaskAction(taskId: string, input: unknown) {
-  return run(async () => {
-    const data = updateTaskInput.parse(input);
-    await db.task.update({
-      where: { id: id.parse(taskId) },
-      data: { ...data, dueOn: data.dueOn === undefined ? undefined : data.dueOn === null ? null : toDbDate(data.dueOn) },
-    });
-  });
+  return run(() => work.updateTask(id.parse(taskId), updateTaskInput.parse(input)));
 }
 
 export async function archiveTaskAction(taskId: string) {
@@ -49,7 +42,24 @@ export async function archiveTaskAction(taskId: string) {
 }
 
 export async function setStepDoneAction(stepId: string, done: boolean) {
-  return run(() => work.setStepDone(id.parse(stepId), z.boolean().parse(done)));
+  return run(() => work.setTaskDone(id.parse(stepId), z.boolean().parse(done)));
+}
+
+/** Complete / reopen any task. For a repeating task, `nextDue` says where it rolled to. */
+export async function setTaskDoneAction(taskId: string, done: boolean): Promise<Result<{ nextDue?: string }>> {
+  await requireOwner();
+  try {
+    const res = await work.setTaskDone(id.parse(taskId), z.boolean().parse(done));
+    revalidatePath("/", "layout");
+    return { ok: true, data: res };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
+  }
+}
+
+/** Quick capture box: one line of text → task (lib/capture.ts syntax). */
+export async function quickCaptureAction(text: string) {
+  return run(() => work.quickCapture(z.string().trim().min(1, "Type something first").max(300).parse(text)));
 }
 
 export async function setHabitCheckedAction(habitId: string, checked: boolean) {
