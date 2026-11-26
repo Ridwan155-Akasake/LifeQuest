@@ -42,21 +42,18 @@ flowchart LR
    git clone https://github.com/Ridwan155-Akasake/LifeQuest.git ~/hq && cd ~/hq
    ```
 
-2. **Create `.env`** from the example:
+2. **Create `.env`** with the setup script (run it yourself, it asks for your HQ password):
    ```bash
-   cp .env.example .env
+   bash deploy/setup-env.sh
    ```
-   - `POSTGRES_PASSWORD`: generate one with `openssl rand -hex 24`.
-   - `OWNER_PASSWORD_*` / `OWNER_SESSION_SECRET`: generate on any machine with Node, from `web/`:
-     `npm run hash-password -- "your password"`, then paste the 3 lines into `.env`.
-   - `LIFEQUEST_VAULT_HOST`: absolute path to the Syncthing copy of the LifeQuest vault on the server.
-   - `CRON_SECRET`: `openssl rand -hex 24`.
-   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: from `web/`, run `npm run vapid` **once**. Regenerating
-     them later silently breaks every phone's notifications.
-   - Optional Telegram fallback: `TELEGRAM_BOT_TOKEN` (the SecondBrain bot's token) and
-     `TELEGRAM_CHAT_ID` (your Telegram user id). Only used when no device receives a reminder.
-   - To test from another device on your LAN before the tunnel exists, set `WEB_BIND=0.0.0.0` and
-     `COOKIE_SECURE=false`.
+   It generates the database password, ticker secret and push keys, stores only a salted hash of
+   your password, optionally copies the Telegram fallback from the SecondBrain bot, and refuses to
+   overwrite an existing `.env`. Nothing secret is printed. **Never regenerate the push keys**
+   once phones are subscribed.
+   - To reach HQ through the existing `ridwansharif.com` tunnel, add this line to `.env`:
+     `COMPOSE_FILE=docker-compose.yml:deploy/compose.homelab-tunnel.yml`
+   - To test from another device on your LAN first, set `WEB_BIND=0.0.0.0` and `COOKIE_SECURE=false`
+     (put them back to `127.0.0.1` / `true` once the tunnel works).
 
 3. **Create the folders** as your normal user, so the containers can write to them:
    ```bash
@@ -108,11 +105,16 @@ docker compose exec -T db pg_restore -U hq -d hq --clean --if-exists < backups/<
 
 ## Public access (Cloudflare Tunnel)
 
-1. Cloudflare Zero Trust → Networks → Tunnels → create a tunnel and copy its token into `CF_TUNNEL_TOKEN`.
-2. Add a public hostname, `hq.ridwansharif.com`, pointing to service `http://web:3000`.
-   This requires the `ridwansharif.com` DNS zone to be on Cloudflare.
-3. Start it with `docker compose --profile tunnel up -d`.
-4. Set `APP_URL=https://<sub>.ridwansharif.com`, `WEB_BIND=127.0.0.1` and `COOKIE_SECURE=true`,
+`ridwansharif.com` is already on Cloudflare and the homelab already runs its tunnel
+(`cloudflared-ridwansharif`, network `homelab_dns-net`). Reuse it:
+
+1. In `.env`: `COMPOSE_FILE=docker-compose.yml:deploy/compose.homelab-tunnel.yml`, then `docker compose up -d`.
+   This joins only the `web` container to `homelab_dns-net` as `hq-web`.
+2. Cloudflare Zero Trust → Networks → Tunnels → the ridwansharif tunnel → **Public hostname** →
+   add `hq.ridwansharif.com` → service **HTTP** → `hq-web:3000`.
+3. (Alternative, a separate tunnel: put its token in `CF_TUNNEL_TOKEN`, use `--profile tunnel`,
+   service `http://web:3000`.)
+4. Set `APP_URL=https://hq.ridwansharif.com`, `WEB_BIND=127.0.0.1` and `COOKIE_SECURE=true`,
    then run `docker compose up -d`.
 5. Optional: put Cloudflare Access in front of the hostname as a second lock.
 

@@ -1,0 +1,19 @@
+# Optional overlay: publish HQ through the EXISTING ridwansharif.com Cloudflare Tunnel
+# (container `cloudflared-ridwansharif`, network `homelab_dns-net`, from ~/homelab).
+#
+# Joins only the `web` container to that network under the alias `hq-web`, so the tunnel can
+# reach it without publishing port 3100 to the LAN. In the Cloudflare dashboard, add a public
+# hostname on that tunnel:  hq.ridwansharif.com  →  HTTP  →  hq-web:3000
+#
+# Enable by adding this line to .env (Compose reads it automatically):
+#   COMPOSE_FILE=docker-compose.yml:deploy/compose.homelab-tunnel.yml
+services:
+  web:
+    networks:
+      homelab:
+        aliases: [hq-web]
+
+networks:
+  homelab:
+    name: homelab_dns-net
+    external: true
