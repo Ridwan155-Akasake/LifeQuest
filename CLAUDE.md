@@ -39,7 +39,7 @@ Single-owner **simple ADHD task tracker** (rescoped 2026-11-21 — NOT full Life
 ## Status
 - Built + verified on throwaway PGlite: Phase 0–2 (2026-10-06); Docker + git; simple tracker v1; HQ rename; timed tasks + push (2026-11-21).
 - Push verified: 30/30 API E2E vs fake push service (encryption/VAPID/410 cleanup/no dup/digest once/Done/Snooze/auth 401/403) + REAL push in headless Edge (WNS endpoint → SW showed notification). Time parser 17/17 incl DST. NOT tested: Telegram fallback send (no token here), real Android phone.
-- NOT done: real DB, compose up on Kali, push to GitHub (no remote), DNS→Cloudflare, real vault stamp, bot takeover, calendar.
+- NOT done: real DB, compose up on Kali, hq tunnel hostname, real vault stamp, bot takeover, calendar. (GitHub push done; DNS already on Cloudflare.)
 - Embedded Claude browser pane blocks SW + notifications → test push in headless Edge via playwright-core (scratchpad).
 - Gotchas: PGlite URL needs `&pgbouncer=true&connection_limit=1`. Bash heredocs mangle `\` → write scripts to scratchpad, `python -I file`. TaskStop leaves npx child node alive → kill by port (Get-NetTCPConnection) after tests.
 
