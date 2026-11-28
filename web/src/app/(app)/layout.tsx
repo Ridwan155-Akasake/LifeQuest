@@ -2,49 +2,54 @@ import Link from "next/link";
 
 import { logoutAction } from "@/app/login/actions";
 import { requireOwner } from "@/lib/auth";
+import { formatClock } from "@/lib/dates";
+import { getPlayer } from "@/lib/play";
+import { getScope } from "@/lib/scope";
 import { listBoards } from "@/lib/work";
 import { CaptureBar } from "@/components/capture/capture-bar";
-import { NavLink } from "@/components/ui/nav-link";
+import { PlayProvider } from "@/components/play/play-provider";
+import { SideNav, TabBar } from "@/components/shell/nav";
+import { SpaceSwitcher } from "@/components/shell/space-switcher";
 
 export const dynamic = "force-dynamic";
 
-/** Owner-only shell: sidebar on desktop, top bar on phones. */
+/**
+ * Owner-only shell. Phone: space switcher on top, tab bar (Now / Plan / Feed / Me) at the
+ * bottom. Desktop: sidebar. The PlayProvider (focus timer + rewards) wraps every page.
+ */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   await requireOwner();
-  // Simple-tracker scope: the job-hunt board is parked (data kept, just not in the menu).
-  const boards = (await listBoards()).filter((b) => b.kind !== "jobs");
+  const [boards, scope, player] = await Promise.all([listBoards(), getScope(), getPlayer()]);
+  const spaces = scope.spaces.map(({ slug, name, color }) => ({ slug, name, color }));
+  const resting = scope.resting.map(({ slug, name, color }) => ({ slug, name, color }));
+
   return (
-    <div className="flex min-h-dvh flex-col md:flex-row">
-      <aside className="border-b border-line bg-base-2 md:sticky md:top-0 md:h-dvh md:w-56 md:shrink-0 md:border-b-0 md:border-r">
-        <div className="flex items-center justify-between px-4 py-4 md:block">
-          <Link href="/" className="font-mono text-xs uppercase tracking-widest text-accent">
-            Ridwan · HQ
+    <PlayProvider sound={scope.settings.sound} level={player.level}>
+      <div className="flex min-h-dvh flex-col md:flex-row">
+        <aside className="hidden border-r border-line bg-base-2 md:sticky md:top-0 md:flex md:h-dvh md:w-60 md:shrink-0 md:flex-col md:px-3 md:py-5">
+          <Link href="/" className="px-3 pb-6 font-display text-xl font-extrabold tracking-tight">
+            HQ<span className="text-accent">.</span>
           </Link>
-          <form action={logoutAction} className="md:hidden">
+          {/* Simple-tracker scope: the job-hunt board is parked (data kept, just not in the menu). */}
+          <SideNav boards={boards.filter((b) => b.kind !== "jobs")} />
+          <form action={logoutAction} className="mt-auto px-3">
             <button className="text-xs text-fg-faint hover:text-fg">Sign out</button>
           </form>
-        </div>
-        <nav className="scroll-thin flex gap-1 overflow-x-auto px-2 pb-3 md:flex-col md:pb-0" aria-label="Main">
-          <NavLink href="/">Today</NavLink>
-          <NavLink href="/tasks">All tasks</NavLink>
-          <p className="hidden px-3 pt-4 pb-1 font-mono text-[10px] uppercase tracking-widest text-fg-faint md:block">Boards</p>
-          {boards.map((b) => (
-            <NavLink key={b.slug} href={`/board/${b.slug}`}>
-              {b.name}
-            </NavLink>
-          ))}
-          <NavLink href="/settings">Settings</NavLink>
-        </nav>
-        <form action={logoutAction} className="absolute bottom-4 left-4 hidden md:block">
-          <button className="text-xs text-fg-faint hover:text-fg">Sign out</button>
-        </form>
-      </aside>
-      <main className="min-w-0 flex-1 px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-5xl">
-          <CaptureBar />
-        </div>
-        {children}
-      </main>
-    </div>
+        </aside>
+        <main className="min-w-0 flex-1 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28 md:px-8 md:pt-6 md:pb-10">
+          <div className="mx-auto flex max-w-5xl flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="font-display text-lg font-extrabold md:hidden" aria-label="HQ home">
+                HQ<span className="text-accent">.</span>
+              </Link>
+              <SpaceSwitcher active={scope.active} spaces={spaces} resting={resting} workStart={formatClock(scope.settings.workHours.start)} />
+            </div>
+            <CaptureBar spaces={spaces} activeSpace={scope.active} />
+          </div>
+          {children}
+        </main>
+        <TabBar />
+      </div>
+    </PlayProvider>
   );
 }

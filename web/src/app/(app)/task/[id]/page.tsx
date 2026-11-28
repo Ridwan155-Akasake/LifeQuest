@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { StartDone } from "@/components/play/start-button";
 import { CheckToggle, CopyButton } from "@/components/today/toggles";
 import { Chip, DueLabel, PriorityBadge, Progress } from "@/components/ui/badges";
 import { fromDbDate, recurrenceLabel, todayISO } from "@/lib/dates";
 import { CATEGORY_LABEL, isClosed, type Category } from "@/lib/domain";
+import { listSpaces } from "@/lib/scope";
 import { getTask } from "@/lib/work";
 import { AddStep } from "./add-step";
 import { TaskEdit } from "./task-edit";
@@ -16,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const t = await getTask(id);
+  const [t, spaces] = await Promise.all([getTask(id), listSpaces()]);
   if (!t) notFound();
   const today = todayISO();
   const done = t.steps.filter((s) => s.status === "done").length;
@@ -29,7 +31,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       : { href: "/", label: "Today" };
 
   return (
-    <article className="mx-auto max-w-3xl">
+    <article className="mx-auto mt-4 max-w-3xl">
       <nav className="mb-4 font-mono text-[11px] text-fg-faint">
         <Link href={back.href} className="hover:text-fg">
           ← {back.label}
@@ -42,7 +44,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           {t.weeklyFocus && <Chip tone="warn">★ weekly focus</Chip>}
           <span className="font-mono text-[11px] text-fg-faint">{t.column?.title ?? CATEGORY_LABEL[t.status as Category] ?? t.status}</span>
         </div>
-        <h1 className={closed ? "mt-3 text-3xl font-semibold text-fg-muted line-through" : "mt-3 text-3xl font-semibold"}>{t.title}</h1>
+        <h1 className={closed ? "mt-3 font-display text-4xl font-extrabold text-fg-muted line-through" : "mt-3 font-display text-4xl font-extrabold"}>{t.title}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-4">
           <PriorityBadge priority={t.priority} />
           {t.dueOn && <DueLabel dueOn={fromDbDate(t.dueOn)} today={today} closed={closed} />}
@@ -53,8 +55,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             </span>
           )}
         </div>
+        {!closed && t.kind !== "quest" && (
+          <StartDone task={{ id: t.id, title: t.title, kind: t.kind === "habit" ? "habit" : t.kind === "step" ? "step" : "task", estimateMin: t.estimateMin, steps: t.steps.map((x) => ({ id: x.id, title: x.title, done: x.status === "done" })) }} />
+        )}
         {t.description && <p className="mt-4 whitespace-pre-wrap text-fg-muted">{t.description}</p>}
-        {t.kind !== "habit" && <TaskEdit id={t.id} dueOn={t.dueOn ? fromDbDate(t.dueOn) : null} dueTime={t.dueTime} recurrence={t.recurrence} priority={t.priority} backHref={back.href} />}
+        {t.kind !== "habit" && <TaskEdit id={t.id} dueOn={t.dueOn ? fromDbDate(t.dueOn) : null} dueTime={t.dueTime} recurrence={t.recurrence} priority={t.priority} backHref={back.href} spaceId={t.spaceId} estimateMin={t.estimateMin} spaces={spaces} />}
       </header>
 
       {(t.kind === "quest" || t.steps.length > 0) && (

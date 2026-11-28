@@ -38,7 +38,7 @@ export function AddHabit() {
             </option>
           ))}
         </select>
-        <button disabled={pending} className="rounded-btn bg-accent px-3 text-sm font-semibold text-base disabled:opacity-60">
+        <button disabled={pending} className="rounded-btn bg-accent px-3 text-sm font-semibold text-ink disabled:opacity-60">
           {pending ? "…" : "Add"}
         </button>
       </div>

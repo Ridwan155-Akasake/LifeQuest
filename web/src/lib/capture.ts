@@ -24,6 +24,8 @@ export type Captured = {
   dueTime?: string;
   recurrence?: string;
   priority: "medium" | "high" | "urgent";
+  /** Space slug from a "#work" style tag (checked against real spaces on save). */
+  space?: string;
 };
 
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
@@ -69,6 +71,10 @@ export function parseCapture(input: string, todayIso: string, nowMinutes?: numbe
       text = text.replace(re, " ");
     }
   };
+
+  // Space: "#work", "#personal" (any space slug; unknown tags just stay in the title).
+  let space: string | undefined;
+  take(/\s#([a-z][a-z0-9-]{0,39})(?=\s)/i, (m) => (space = m[1]!.toLowerCase()));
 
   // Priority: "!!" urgent, "!" high (as their own word).
   take(/\s!!(?=\s)/, () => (priority = "urgent"));
@@ -140,5 +146,5 @@ export function parseCapture(input: string, todayIso: string, nowMinutes?: numbe
   }
 
   const title = text.replace(/\s+/g, " ").trim();
-  return { title: title || input.trim(), dueOn, dueTime, recurrence, priority };
+  return { title: title || input.trim(), dueOn, dueTime, recurrence, priority, space };
 }

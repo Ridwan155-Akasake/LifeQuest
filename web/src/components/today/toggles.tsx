@@ -25,7 +25,7 @@ export function CheckToggle({ id, checked, kind, label, xp }: { id: string; chec
       title={optimistic ? "Undo" : `+${xp} XP`}
       className={cn(
         "grid h-5 w-5 shrink-0 place-items-center rounded-md border text-[11px] transition",
-        optimistic ? "border-accent bg-accent text-base" : "border-line-strong hover:border-accent",
+        optimistic ? "border-accent bg-accent text-ink" : "border-line-strong hover:border-accent",
       )}
     >
       {optimistic ? "✓" : ""}

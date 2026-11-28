@@ -85,7 +85,7 @@ export function PushSettings({ vapidKey }: { vapidKey: string }) {
       {!vapidKey && <p className="text-sm text-warn">Server isn&apos;t configured for push yet (VAPID keys missing in .env).</p>}
       <div className="flex flex-wrap gap-2">
         {state === "off" && vapidKey && (
-          <button type="button" disabled={pending} onClick={enable} className={`${btn} bg-accent text-base`}>
+          <button type="button" disabled={pending} onClick={enable} className={`${btn} bg-accent text-ink`}>
             Turn on notifications
           </button>
         )}

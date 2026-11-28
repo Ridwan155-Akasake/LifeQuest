@@ -40,7 +40,14 @@ const LABELS = [
   { name: "money", color: "warn" },
 ];
 
+/** Same ids as the 20261128 migration backfill, so a fresh install and an upgraded one match. */
+const SPACES = [
+  { id: "space_personal", slug: "personal", name: "Personal", color: "mint", order: 0 },
+  { id: "space_work", slug: "work", name: "Work", color: "sky", order: 1 },
+];
+
 async function main() {
+  for (const s of SPACES) await db.space.upsert({ where: { slug: s.slug }, update: {}, create: s });
   for (const [order, b] of BOARDS.entries()) {
     const board = await db.board.upsert({
       where: { slug: b.slug },

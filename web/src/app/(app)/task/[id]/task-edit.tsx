@@ -15,7 +15,27 @@ const REPEATS = [
 ];
 
 /** Due date, repeat, priority, delete — changes save as soon as you pick them. */
-export function TaskEdit({ id, dueOn, dueTime, recurrence, priority, backHref }: { id: string; dueOn: string | null; dueTime: string | null; recurrence: string | null; priority: string; backHref: string }) {
+export function TaskEdit({
+  id,
+  dueOn,
+  dueTime,
+  recurrence,
+  priority,
+  backHref,
+  spaceId,
+  estimateMin,
+  spaces,
+}: {
+  id: string;
+  dueOn: string | null;
+  dueTime: string | null;
+  recurrence: string | null;
+  priority: string;
+  backHref: string;
+  spaceId: string | null;
+  estimateMin: number | null;
+  spaces: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
@@ -55,6 +75,28 @@ export function TaskEdit({ id, dueOn, dueTime, recurrence, priority, backHref }:
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
                 {p[0]!.toUpperCase() + p.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-fg-faint">Space</span>
+          <select defaultValue={spaceId ?? ""} onChange={(e) => save({ spaceId: e.target.value || null })} className={field}>
+            {!spaceId && <option value="">—</option>}
+            {spaces.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-fg-faint">Takes about</span>
+          <select defaultValue={estimateMin ?? ""} onChange={(e) => save({ estimateMin: e.target.value ? Number(e.target.value) : null })} className={field}>
+            <option value="">Not sure</option>
+            {[5, 10, 15, 25, 45, 60, 90].map((m) => (
+              <option key={m} value={m}>
+                {m} min
               </option>
             ))}
           </select>

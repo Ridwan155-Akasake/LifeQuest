@@ -2,46 +2,107 @@
 
 /*
  * Design tokens — the ONLY place colours live (ARCNIR rule: no literal colours in
- * components). Accent follows the portfolio's 4-theme system via [data-accent].
+ * components). Redesign 2026-11-28: night-navy base, ember (amber → orange) for action
+ * and XP, mint for done. Space colours are palette keys (--color-sp-*). The Quest view
+ * has its own dusk-purple set (--color-q-*).
  */
 @theme {
-  --color-base: #070a12;
-  --color-base-2: #0b1019;
-  --color-surface: #111827;
-  --color-line: #1e293b;
-  --color-line-strong: #334155;
-  --color-fg: #e5e9f0;
-  --color-fg-muted: #9aa5b4;
-  --color-fg-faint: #64748b;
+  --color-base: #0b1020;
+  --color-base-2: #0e1428;
+  --color-surface: #141b33;
+  --color-surface-2: #1b2340;
+  --color-line: #1b2340;
+  --color-line-strong: #2a3458;
+  --color-fg: #eef1ff;
+  --color-fg-muted: #9aa6d6;
+  --color-fg-faint: #6b76a6;
 
-  --color-accent: var(--accent, #22d3ee);
-  --color-live: #34d399;
-  --color-warn: #fbbf24;
-  --color-stop: #f87171;
-  --color-info: #60a5fa;
+  --color-accent: #ffb547;
+  --color-ember: #ff7a45;
+  --color-live: #5be3b5;
+  --color-warn: #ffcf5a;
+  --color-stop: #ff6b6b;
+  --color-info: #7fb4ff;
+  --color-ink: #1b0d00;
 
-  --radius-btn: 10px;
-  --radius-card: 16px;
+  /* Space palette */
+  --color-sp-mint: #5be3b5;
+  --color-sp-sky: #7fb4ff;
+  --color-sp-amber: #ffb547;
+  --color-sp-rose: #ff7aa8;
+  --color-sp-violet: #b69cff;
+  --color-sp-lime: #b8e65a;
 
-  --font-serif: var(--font-lora), Georgia, serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  /* Quest view (dusk) */
+  --color-q-bg: #170f2c;
+  --color-q-card: #221640;
+  --color-q-line: #35275f;
+  --color-q-gold: #ffd166;
+  --color-q-pink: #ef476f;
+  --color-q-lilac: #c3a8ff;
+  --color-q-ink: #2a0f2a;
+  --color-q-clear: #173a2e;
+
+  --radius-btn: 12px;
+  --radius-card: 18px;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-game: var(--font-chakra), var(--font-inter), system-ui, sans-serif;
+  --font-pixel: var(--font-silkscreen), ui-monospace, monospace;
+
+  --animate-pop: pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1);
+  --animate-pulse-ring: pulse-ring 2.4s ease-in-out infinite;
+  --animate-rise: rise 0.35s ease-out;
 }
 
-:root { --accent: #22d3ee; }
-[data-accent="green"] { --accent: #4ade80; }
-[data-accent="crimson"] { --accent: #f43f5e; }
-[data-accent="violet"] { --accent: #a78bfa; }
+@keyframes pop { from { transform: scale(0.3); opacity: 0; } }
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+@keyframes spark {
+  0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.4); }
+}
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 10px color-mix(in oklab, var(--color-ember) 14%, transparent), 0 0 0 22px color-mix(in oklab, var(--color-ember) 6%, transparent); }
+  50% { box-shadow: 0 0 0 14px color-mix(in oklab, var(--color-ember) 18%, transparent), 0 0 0 32px color-mix(in oklab, var(--color-ember) 5%, transparent); }
+}
 
 html { color-scheme: dark; }
 body {
   background: var(--color-base);
   color: var(--color-fg);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+h1, h2, h3 { text-wrap: balance; }
+
+/* Space colour helpers: <span data-space-color="sky" class="space-dot"> */
+[data-space-color="mint"] { --sp: var(--color-sp-mint); }
+[data-space-color="sky"] { --sp: var(--color-sp-sky); }
+[data-space-color="amber"] { --sp: var(--color-sp-amber); }
+[data-space-color="rose"] { --sp: var(--color-sp-rose); }
+[data-space-color="violet"] { --sp: var(--color-sp-violet); }
+[data-space-color="lime"] { --sp: var(--color-sp-lime); }
+.space-dot { background: var(--sp, var(--color-fg-faint)); }
+.space-text { color: var(--sp, var(--color-fg-muted)); }
+.space-chip { color: var(--sp, var(--color-fg-muted)); background: color-mix(in oklab, var(--sp, var(--color-fg-muted)) 14%, transparent); }
+
+/* The big START button. */
+.start-orb {
+  background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--color-accent) 80%, white), var(--color-ember) 72%);
+  color: var(--color-ink);
+}
+
+.xp-fill { background: linear-gradient(90deg, var(--color-accent), var(--color-ember)); }
+.q-xp-fill { background: repeating-linear-gradient(90deg, var(--color-q-gold) 0 8px, color-mix(in oklab, var(--color-q-gold) 85%, black) 8px 10px); }
 
 /* Thin scrollbars for the horizontal board. */
 .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }

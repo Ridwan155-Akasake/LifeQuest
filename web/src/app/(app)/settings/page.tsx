@@ -1,17 +1,41 @@
 import { PushSettings } from "@/components/notifications/push-settings";
+import { SpacesEditor, ViewPicker, WorkHoursEditor } from "@/components/settings/app-settings";
 import { db } from "@/lib/db";
 import { vapidPublicKey } from "@/lib/push";
+import { getSettings } from "@/lib/scope";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const devices = await db.pushSubscription.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, device: true, createdAt: true, lastOkAt: true, failCount: true } });
+  const [devices, settings, spaces] = await Promise.all([
+    db.pushSubscription.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, device: true, createdAt: true, lastOkAt: true, failCount: true } }),
+    getSettings(),
+    db.space.findMany({ where: { archivedAt: null }, orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { _count: { select: { tasks: { where: { archivedAt: null } } } } } }),
+  ]);
   const telegram = Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
   const digest = process.env.DIGEST_TIME || "08:00";
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8">
-      <h1 className="text-3xl font-semibold">Settings</h1>
+    <div className="mx-auto mt-4 flex max-w-3xl flex-col gap-8">
+      <h1 className="font-display text-4xl font-extrabold">Settings</h1>
+
+      <section className="rounded-card border border-line p-5">
+        <h2 className="text-lg font-semibold">Home screen</h2>
+        <p className="mt-1 mb-4 text-sm text-fg-muted">Same tasks, different look. Switch any time.</p>
+        <ViewPicker current={settings.view} />
+      </section>
+
+      <section className="rounded-card border border-line p-5">
+        <h2 className="text-lg font-semibold">Spaces</h2>
+        <p className="mt-1 mb-4 text-sm text-fg-muted">Keep personal and work apart. Pick one at the top of any screen, or “All”.</p>
+        <SpacesEditor spaces={spaces.map((s) => ({ id: s.id, slug: s.slug, name: s.name, color: s.color, workHoursOnly: s.workHoursOnly, count: s._count.tasks }))} />
+      </section>
+
+      <section className="rounded-card border border-line p-5">
+        <h2 className="text-lg font-semibold">Work hours</h2>
+        <p className="mt-1 mb-4 text-sm text-fg-muted">Spaces marked “only during work hours” hide from “All” outside these times, so evenings and weekends stay yours.</p>
+        <WorkHoursEditor settings={settings} />
+      </section>
 
       <section className="rounded-card border border-line p-5">
         <h2 className="text-lg font-semibold">Notifications</h2>

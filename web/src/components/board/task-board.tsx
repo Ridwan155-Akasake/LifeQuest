@@ -365,7 +365,7 @@ function QuickAdd({ columnId, kind }: { columnId: string; kind: TaskKind }) {
         className="h-9 rounded-btn border border-line-strong bg-base px-2.5 text-sm outline-none focus:border-accent"
       />
       <div className="flex gap-2">
-        <button disabled={pending} className="rounded-btn bg-accent px-3 py-1 text-sm font-semibold text-base disabled:opacity-60">
+        <button disabled={pending} className="rounded-btn bg-accent px-3 py-1 text-sm font-semibold text-ink disabled:opacity-60">
           {pending ? "Adding…" : "Add"}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="px-2 text-sm text-fg-muted hover:text-fg">
@@ -418,7 +418,7 @@ function AddColumn({ boardId }: { boardId: string }) {
         </select>
       </label>
       <div className="flex gap-2">
-        <button disabled={pending} className="rounded-btn bg-accent px-3 py-1.5 text-sm font-semibold text-base disabled:opacity-60">
+        <button disabled={pending} className="rounded-btn bg-accent px-3 py-1.5 text-sm font-semibold text-ink disabled:opacity-60">
           {pending ? "Adding…" : "Add column"}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="px-2 text-sm text-fg-muted hover:text-fg">

@@ -12,7 +12,7 @@ import { cn } from "@/lib/cn";
  * are read from the text ("pay rent every month 12/1 !") and previewed before saving, so
  * the brain dump never has to stop for a form. Press "/" anywhere to jump here.
  */
-export function CaptureBar() {
+export function CaptureBar({ spaces, activeSpace }: { spaces: { slug: string; name: string; color: string }[]; activeSpace: string }) {
   const [text, setText] = useState("");
   const [flash, setFlash] = useState<{ msg: string; tone: "ok" | "err" } | null>(null);
   const [pending, start] = useTransition();
@@ -20,6 +20,8 @@ export function CaptureBar() {
   const now = localNow();
   const today = now.date;
   const preview = text.trim() ? parseCapture(text, today, now.minutes) : null;
+  const tagged = preview?.space ? spaces.find((s) => s.slug === preview.space) : undefined;
+  const target = tagged ?? spaces.find((s) => s.slug === (activeSpace === "all" ? "personal" : activeSpace));
 
   // Home-screen shortcut "Add a task" opens /?capture=1 → jump straight into the box.
   useEffect(() => {
@@ -46,7 +48,7 @@ export function CaptureBar() {
 
   return (
     <form
-      className="mb-6"
+      className="mb-2"
       onSubmit={(e) => {
         e.preventDefault();
         if (!preview) return;
@@ -55,7 +57,7 @@ export function CaptureBar() {
           const res = await quickCaptureAction(text);
           if (!res.ok) return setFlash({ msg: res.error, tone: "err" });
           setText("");
-          setFlash({ msg: `Added “${preview.title}” → ${where}`, tone: "ok" });
+          setFlash({ msg: `Added “${preview.title}” → ${target ? `${target.name} · ` : ""}${where}`, tone: "ok" });
         });
       }}
     >
@@ -74,11 +76,11 @@ export function CaptureBar() {
           onKeyDown={(e) => e.key === "Escape" && (setText(""), ref.current?.blur())}
           maxLength={300}
           autoComplete="off"
-          placeholder="Add a task…  e.g. “call dentist tomorrow at 3pm” or “pay rent every month 12/1 !”"
+          placeholder="Add a task…  “call dentist tomorrow 3pm”  ·  “invoice client fri #work !”"
           className="h-11 min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-faint"
         />
         <kbd className="hidden rounded border border-line px-1.5 font-mono text-[10px] text-fg-faint md:inline">/</kbd>
-        <button disabled={pending || !preview} className="rounded-btn bg-accent px-3 py-1 text-sm font-semibold text-base transition disabled:opacity-40">
+        <button disabled={pending || !preview} className="rounded-btn bg-accent px-3 py-1 text-sm font-semibold text-ink transition disabled:opacity-40">
           {pending ? "…" : "Add"}
         </button>
       </div>
@@ -87,7 +89,8 @@ export function CaptureBar() {
           ? flash.msg
           : preview && (
               <>
-                “{preview.title}” → {preview.dueOn ? `due ${relativeDue(preview.dueOn, today).label}` : "Inbox (no date)"}
+                “{preview.space && !tagged ? `${preview.title} #${preview.space}` : preview.title}” → {target ? `${target.name} · ` : ""}
+                {preview.dueOn ? `due ${relativeDue(preview.dueOn, today).label}` : "Inbox (no date)"}
                 {preview.dueTime && ` · ⏰ ${formatClock(preview.dueTime)}`}
                 {preview.recurrence && ` · ↻ ${recurrenceLabel(preview.recurrence)}`}
                 {preview.priority !== "medium" && ` · ${preview.priority}`}

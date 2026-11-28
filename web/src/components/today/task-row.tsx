@@ -7,6 +7,7 @@ import { setTaskDoneAction, updateTaskAction } from "@/lib/actions";
 import { addDays, formatClock, recurrenceLabel, relativeDue } from "@/lib/dates";
 import { cn } from "@/lib/cn";
 import type { TodayItem } from "@/lib/work";
+import { usePlay } from "@/components/play/play-provider";
 
 const PRIORITY_DOT: Record<string, string> = { urgent: "bg-stop", high: "bg-warn", medium: "", low: "" };
 
@@ -19,6 +20,7 @@ export function TaskRow({ item, today, showSchedule }: { item: TodayItem; today:
   const [gone, setGone] = useState(false);
   const [note, setNote] = useState("");
   const [pending, start] = useTransition();
+  const play = usePlay();
 
   const complete = () =>
     start(async () => {
@@ -65,8 +67,17 @@ export function TaskRow({ item, today, showSchedule }: { item: TodayItem; today:
         {PRIORITY_DOT[item.priority] && <span className={cn("h-2 w-2 shrink-0 rounded-full", PRIORITY_DOT[item.priority])} title={`${item.priority} priority`} />}
         <Link href={`/task/${item.id}`} className="min-w-0 flex-1 hover:text-accent">
           <span className="block truncate">{item.title}</span>
-          {(item.parent || item.areaName) && <span className="block truncate font-mono text-[11px] text-fg-faint">{item.parent?.title ?? item.areaName}</span>}
+          {(item.parent || item.areaName || item.space) && (
+            <span className="flex items-center gap-1.5 truncate font-mono text-[11px] text-fg-faint">
+              {item.space && <span data-space-color={item.space.color} className="space-dot h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden />}
+              {item.space?.name}
+              {(item.parent || item.areaName) && ` · ${item.parent?.title ?? item.areaName}`}
+            </span>
+          )}
         </Link>
+        <button type="button" onClick={() => play.start({ id: item.id, title: item.title, kind: "task", estimateMin: item.estimateMin })} aria-label={`Start ${item.title}`} title="Start focus" className="grid h-7 w-7 shrink-0 place-items-center rounded-btn text-accent hover:bg-accent/10">
+          ▶
+        </button>
         <span className="flex shrink-0 items-center gap-2 font-mono text-[11px]">
           {item.recurrence && (
             <span className="text-info" title={recurrenceLabel(item.recurrence)}>

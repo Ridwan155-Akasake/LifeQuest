@@ -49,6 +49,8 @@ export const createTaskInput = z.object({
   dueOn: day.optional(),
   dueTime: clock.optional(),
   recurrence: recurrence.optional(),
+  spaceId: id.optional(),
+  estimateMin: z.number().int().min(1).max(600).optional(),
 });
 export type CreateTaskInput = z.input<typeof createTaskInput>;
 
@@ -63,6 +65,8 @@ export const updateTaskInput = z.object({
   weeklyFocus: z.boolean().optional(),
   claudePrompt: z.string().max(4000).nullable().optional(),
   xp: z.number().int().min(0).max(1000).optional(),
+  spaceId: id.nullable().optional(),
+  estimateMin: z.number().int().min(1).max(600).nullable().optional(),
 });
 export type UpdateTaskInput = z.input<typeof updateTaskInput>;
 
@@ -70,5 +74,46 @@ export const columnInput = z.object({
   title: z.string().trim().min(1, "Name the column").max(120),
   category: z.enum(CATEGORIES),
 });
+
+// ── Spaces, views, settings (redesign R1) ───────────────────────────────────
+
+/** Space colours are palette keys mapped to CSS tokens (--color-sp-<key>). */
+export const SPACE_COLORS = ["mint", "sky", "amber", "rose", "violet", "lime"] as const;
+export type SpaceColor = (typeof SPACE_COLORS)[number];
+
+/** Home screen styles, switchable in Settings → View. */
+export const VIEWS = ["hybrid", "quest", "cockpit"] as const;
+export type View = (typeof VIEWS)[number];
+export const VIEW_LABEL: Record<View, { name: string; blurb: string }> = {
+  hybrid: { name: "Hybrid", blurb: "One thing now, a big Start button, and overdue tasks as bosses." },
+  quest: { name: "Quest", blurb: "The full game: quest cards, XP, levels, badges and bosses." },
+  cockpit: { name: "Cockpit", blurb: "Your day as a timeline with a live feed. Calm and informative." },
+};
+
+export const settingsInput = z.object({
+  view: z.enum(VIEWS),
+  sound: z.boolean(),
+  workHours: z.object({
+    start: clock,
+    end: clock,
+    /** 0 = Sunday … 6 = Saturday */
+    days: z.array(z.number().int().min(0).max(6)).max(7),
+  }),
+});
+export type Settings = z.infer<typeof settingsInput>;
+export const DEFAULT_SETTINGS: Settings = { view: "hybrid", sound: true, workHours: { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] } };
+
+export const spaceInput = z.object({
+  name: z.string().trim().min(1, "Name the space").max(40),
+  color: z.enum(SPACE_COLORS),
+  workHoursOnly: z.boolean().default(false),
+});
+
+/** Focus timer lengths offered on the Start screen (minutes). */
+export const FOCUS_LENGTHS = [5, 15, 25, 45] as const;
+export const FOCUS_OUTCOMES = ["done", "stopped", "stuck"] as const;
+
+/** Bonus for finishing a task after its due date passed (a "boss"). */
+export const BOSS_BONUS_XP = 25;
 
 export type Result<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };

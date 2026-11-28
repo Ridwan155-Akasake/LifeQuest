@@ -1,12 +1,13 @@
 import { TaskRow } from "@/components/today/task-row";
 import { addDays } from "@/lib/dates";
+import { getScope, inScope } from "@/lib/scope";
 import { getAllOpen, type TodayItem } from "@/lib/work";
 
-export const metadata = { title: "All tasks" };
+export const metadata = { title: "Plan" };
 
 /** Everything open, grouped by when — so a task due in 3 weeks is never out of sight. */
 export default async function AllTasksPage() {
-  const { today, items } = await getAllOpen();
+  const { today, items } = await getAllOpen(inScope(await getScope()));
   const week = addDays(today, 7);
   const month = addDays(today, 30);
 
@@ -20,9 +21,9 @@ export default async function AllTasksPage() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8">
+    <div className="mx-auto mt-4 flex max-w-3xl flex-col gap-8">
       <header>
-        <h1 className="text-3xl font-semibold">All tasks</h1>
+        <h1 className="font-display text-4xl font-extrabold">Plan</h1>
         <p className="mt-1 font-mono text-[11px] text-fg-faint">{items.length} open · repeating tasks show their next date</p>
       </header>
       {items.length === 0 && <p className="text-fg-faint">Nothing open. Add something in the box above.</p>}

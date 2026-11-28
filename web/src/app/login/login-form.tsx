@@ -24,7 +24,7 @@ export function LoginForm() {
           {state.error}
         </p>
       )}
-      <button disabled={pending} className="h-10 rounded-btn bg-accent font-semibold text-base transition hover:opacity-90 disabled:opacity-60">
+      <button disabled={pending} className="h-10 rounded-btn bg-accent font-semibold text-ink transition hover:opacity-90 disabled:opacity-60">
         {pending ? "Checking…" : "Enter"}
       </button>
     </form>

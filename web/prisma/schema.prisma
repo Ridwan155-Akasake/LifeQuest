@@ -20,25 +20,67 @@ datasource db {
 
 // ── Life structure ───────────────────────────────────────────────────────────
 
+/// A space keeps parts of life apart: Personal, Work (ARCNIR), or any custom one.
+/// Every task belongs to one; the header switcher filters the whole app by it.
+model Space {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  name          String
+  /// Palette key (mint | sky | amber | rose | violet | lime), never a literal colour.
+  color         String    @default("mint")
+  order         Int       @default(0)
+  /// When true, this space hides outside work hours (Settings → Work hours) in the "All" view.
+  workHoursOnly Boolean   @default(false)
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tasks         Task[]
+  areas         Area[]
+}
+
+/// Small key → JSON settings (view mode, work hours, sound). One row per key.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+/// A focus timer run on a task ("START"). Outcome: done | stopped | stuck.
+model FocusSession {
+  id         String    @id @default(cuid())
+  taskId     String?
+  plannedMin Int
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+  outcome    String?
+  task       Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([startedAt])
+  @@index([taskId])
+}
+
 /// A LifeQuest Campaign (major life area) or Dev Project.
 model Area {
-  id          String    @id @default(cuid())
-  slug        String    @unique
-  name        String
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  name         String
   /// campaign | dev-project
-  kind        String    @default("campaign")
+  kind         String    @default("campaign")
   /// One-sentence win condition (the blockquote under the title in the vault).
   winCondition String?
-  color       String    @default("accent")
+  color        String    @default("accent")
   /// active | paused | done
-  status      String    @default("active")
-  order       Int       @default(0)
-  vaultId     String?   @unique
-  vaultPath   String?
-  archivedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  tasks       Task[]
+  status       String    @default("active")
+  order        Int       @default(0)
+  vaultId      String?   @unique
+  vaultPath    String?
+  /// New tasks in this area land in this space.
+  spaceId      String?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  tasks        Task[]
+  space        Space?    @relation(fields: [spaceId], references: [id], onDelete: SetNull)
 }
 
 // ── Kanban (ported from ARCNIR WorkflowNode / Task) ──────────────────────────
@@ -92,6 +134,10 @@ model Task {
   /// low | medium | high | urgent
   priority     String    @default("medium")
   areaId       String?
+  /// Personal / Work / custom. Null only for rows created before spaces existed.
+  spaceId      String?
+  /// Rough size in minutes; sets the default focus timer.
+  estimateMin  Int?
   /// Step → its quest. One level only (enforced in the service, like ARCNIR subtasks).
   parentId     String?
   startOn      DateTime? @db.Date
@@ -123,18 +169,21 @@ model Task {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  board       Board?       @relation(fields: [boardId], references: [id], onDelete: SetNull)
-  column      Column?      @relation(fields: [columnId], references: [id], onDelete: SetNull)
-  area        Area?        @relation(fields: [areaId], references: [id], onDelete: SetNull)
-  parent      Task?        @relation("Steps", fields: [parentId], references: [id], onDelete: Cascade)
-  steps       Task[]       @relation("Steps")
-  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  board       Board?         @relation(fields: [boardId], references: [id], onDelete: SetNull)
+  column      Column?        @relation(fields: [columnId], references: [id], onDelete: SetNull)
+  area        Area?          @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  space       Space?         @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+  parent      Task?          @relation("Steps", fields: [parentId], references: [id], onDelete: Cascade)
+  steps       Task[]         @relation("Steps")
+  contact     Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
   habitChecks HabitCheck[]
   labels      TaskLabel[]
   activity    Activity[]
+  focus       FocusSession[]
 
   @@index([boardId, columnId, order])
   @@index([areaId])
+  @@index([spaceId])
   @@index([parentId, order])
   @@index([kind, status])
   @@index([dueOn])

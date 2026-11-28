@@ -178,3 +178,23 @@ Planned stack, in its own folder on the server (`~/hq/` — NOT `~/LifeQuest`, w
 
 Order: create the repo → push → clone on Kali → `.env` → `docker compose up -d` → seed → vault import
 dry run → `--apply` → add the tunnel hostname → test a restore from a backup.
+
+## 9. Redesign (decided 2026-11-28)
+
+User wants HQ to be ADHD-friendly: motivating, pushy, fluid. Mockups: https://claude.ai/artifact/DR538zE4PrVv6XYrkkHrPc
+
+**Three home views, switchable in Settings** (same data, different screens):
+- **Hybrid (default)** = "One thing now" (one big task + START, focus timer, XP reward, "split it") + boss battles for overdue tasks.
+- **Quest** = full game board (quest cards, XP, levels, badges, bosses).
+- **Cockpit** = day timeline with "now" line + live feed.
+
+**Shared by all views:** Spaces (Personal / Work·ARCNIR / custom, switchable, optional hide Work after hours); Feed page; nag-until-answered reminders; HQ's own focus check-ins; Telegram ✅ receipt on every done (+ backup when a phone alert goes unanswered); full-screen alarm + focus lock (Android app).
+
+| Phase | What | Where |
+|---|---|---|
+| R1 ✅  Data: Space model + Task.spaceId (IT Firm/ARCNIR → Work, rest → Personal), Settings (view mode, work hours), Task.estimateMin, FocusSession, boss = overdue task (HP = open steps, auto 3 if none), XP/levels switched on | web + DB migration |
+| R2 ✅  New look + shell: tokens, phone tab bar (Now / Plan / Feed / Me), desktop sidebar, space switcher, Settings → View | web |
+| R3 ✅  The three home views + focus timer + reward screen (sound/animation) + split-it steps | web |
+| R4 | Pushiness on web: nag repeats until Done/Snooze/Start (limited snoozes), focus check-ins, Telegram ✅ receipts | web + ticker |
+| R5 | Feed: FeedItem table; HQ logs reminders/check-ins/digests/receipts; bot forwards Telegram chat to HQ (`/api/feed/ingest`) since only one process can read the bot's updates | web + bot (small change) |
+| R6 | Android app (Capacitor, sideloaded APK): full-screen alarm (full-screen intent), focus lock (app blocker), home-screen widget | Android |
