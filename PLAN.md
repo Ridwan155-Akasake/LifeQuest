@@ -198,3 +198,12 @@ User wants HQ to be ADHD-friendly: motivating, pushy, fluid. Mockups: https://cl
 | R4 | Pushiness on web: nag repeats until Done/Snooze/Start (limited snoozes), focus check-ins, Telegram ✅ receipts | web + ticker |
 | R5 | Feed: FeedItem table; HQ logs reminders/check-ins/digests/receipts; bot forwards Telegram chat to HQ (`/api/feed/ingest`) since only one process can read the bot's updates | web + bot (small change) |
 | R6 | Android app (Capacitor, sideloaded APK): full-screen alarm (full-screen intent), focus lock (app blocker), home-screen widget | Android |
+
+## 10. Beta for friends & family (decided 2026-11-28, NOT started)
+
+Ridwan uses HQ alone first to get a feel for it. Later: **lifequest.arcnir.com**, a closed beta for friends & family (Rakib first).
+
+- **Accounts:** real multi-user (not one copy per person, which won't scale past a few people). Every table gets an owner (`userId`), every query filters by it. Invite links: the invitee opens a one-time link and picks their own password (Ridwan never sees it).
+- **Telegram:** no shared bot. Each user connects their own bot from Settings, using a step-by-step BotFather guide (create bot → paste token → send /start → HQ finds the chat id → test message). Ridwan's SecondBrain bot stays his only.
+- **Prep that helps now:** build R4's Telegram receipts with the bot token + chat id stored in Settings (DB), not only `.env`, so the same screen works for beta users later.
+- **To check before launch:** whether arcnir.com DNS is on Cloudflare (needed for the tunnel hostname); privacy notice for beta users; per-user backups/export.
