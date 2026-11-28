@@ -51,6 +51,8 @@ export async function getPlayer(): Promise<Player> {
 /** Start a focus timer. Any timer still running is closed as "stopped" first. */
 export async function startFocus(taskId: string | null, minutes: number) {
   await db.focusSession.updateMany({ where: { endedAt: null }, data: { endedAt: new Date(), outcome: "stopped" } });
+  // Pressing Start answers the task's reminder: the nagging stops.
+  if (taskId) await db.task.updateMany({ where: { id: taskId }, data: { nagCount: 0, nagNextAt: null } });
   const s = await db.focusSession.create({ data: { taskId, plannedMin: minutes }, select: { id: true, startedAt: true, plannedMin: true } });
   return { id: s.id, startedAt: s.startedAt.toISOString(), plannedMin: s.plannedMin };
 }
@@ -119,23 +121,79 @@ const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 
 // ── Feed ─────────────────────────────────────────────────────────────────────
 
-export type FeedEntry = { id: string; at: string; day: string; time: string; type: string; text: string; xp: number; taskId: string | null; space: SpaceTag };
+export type FeedGroup = "done" | "reminders" | "telegram" | "other";
+export type FeedEntry = {
+  id: string;
+  at: string;
+  day: string;
+  time: string;
+  type: string;
+  group: FeedGroup;
+  text: string;
+  body: string | null;
+  channel: string | null;
+  xp: number;
+  taskId: string | null;
+  space: SpaceTag;
+};
 
 // vault.imported is left out: one import writes a row per quest, which would flood the feed.
-const FEED_TYPES = ["task.completed", "task.reopened", "task.created", "habit.checked", "boss.defeated", "focus.ended", "digest.sent"];
+// digest.sent too: the digest itself is a FeedItem now (with what it said).
+const FEED_TYPES = ["task.completed", "task.reopened", "task.created", "habit.checked", "boss.defeated", "focus.ended"];
 
-export async function getFeed(scope: Prisma.TaskWhereInput, take = 60, before?: Date): Promise<FeedEntry[]> {
-  const rows = await db.activity.findMany({
-    where: {
-      type: { in: FEED_TYPES },
-      ...(before ? { createdAt: { lt: before } } : {}),
-      ...(Object.keys(scope).length ? { OR: [{ taskId: null }, { task: { AND: [scope] } }] } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    take,
-    select: { id: true, type: true, xp: true, on: true, createdAt: true, data: true, taskId: true, task: { select: { title: true, space: { select: { slug: true, name: true, color: true } } } } },
-  });
-  return rows.map((a) => {
+const ITEM_TEXT: Record<string, (title: string) => string> = {
+  reminder: (t) => `Reminder: ${t}`,
+  nag: (t) => `Nudged again: ${t}`,
+  checkin: (t) => t,
+  digest: (t) => t,
+  receipt: (t) => `✅ Telegram receipt — ${t}`,
+  "telegram.in": (t) => t,
+  "telegram.out": (t) => t,
+  alert: (t) => `Alert: ${t}`,
+  test: (t) => t,
+};
+const ITEM_GROUP: Record<string, FeedGroup> = { reminder: "reminders", nag: "reminders", checkin: "reminders", digest: "reminders", receipt: "telegram", "telegram.in": "telegram", "telegram.out": "telegram" };
+
+/**
+ * The Feed: what you did (Activity) and what HQ said or heard (FeedItem: reminders, nags,
+ * check-ins, digests, Telegram receipts and chat), newest first. In a space, rows tied to a
+ * task outside it are hidden; rows tied to no task (Telegram chat, digests) always show.
+ */
+export async function getFeed(scope: Prisma.TaskWhereInput, take = 60, before?: Date, group?: FeedGroup): Promise<FeedEntry[]> {
+  const scoped = Object.keys(scope).length > 0;
+  const wantActivity = !group || group === "done" || group === "other";
+  const wantItems = !group || group !== "done";
+  const [rows, items] = await Promise.all([
+    wantActivity
+      ? db.activity.findMany({
+          where: {
+            type: { in: group === "done" ? ["task.completed", "habit.checked", "boss.defeated"] : group === "other" ? ["task.created", "task.reopened", "focus.ended"] : FEED_TYPES },
+            ...(before ? { createdAt: { lt: before } } : {}),
+            ...(scoped ? { OR: [{ taskId: null }, { task: { AND: [scope] } }] } : {}),
+          },
+          orderBy: { createdAt: "desc" },
+          take,
+          select: { id: true, type: true, xp: true, on: true, createdAt: true, data: true, taskId: true, task: { select: { title: true, space: { select: { slug: true, name: true, color: true } } } } },
+        })
+      : [],
+    wantItems
+      ? db.feedItem.findMany({
+          where: {
+            ...(before ? { at: { lt: before } } : {}),
+            ...(group === "reminders" ? { kind: { in: ["reminder", "nag", "checkin", "digest"] } } : group === "telegram" ? { kind: { in: ["receipt", "telegram.in", "telegram.out"] } } : group === "other" ? { kind: { in: ["alert", "test"] } } : {}),
+          },
+          orderBy: { at: "desc" },
+          take,
+        })
+      : [],
+  ]);
+
+  // Space info for feed items tied to a task (and drop those outside the chosen space).
+  const ids = [...new Set(items.map((i) => i.taskId).filter((x): x is string => !!x))];
+  const tasks = ids.length ? await db.task.findMany({ where: { id: { in: ids }, ...(scoped ? { AND: [scope] } : {}) }, select: { id: true, space: { select: { slug: true, name: true, color: true } } } }) : [];
+  const spaceOf = new Map(tasks.map((t) => [t.id, t.space]));
+
+  const fromActivity = rows.map((a): FeedEntry => {
     const d = (a.data ?? {}) as Record<string, unknown>;
     const title = a.task?.title ?? "a task";
     const text =
@@ -151,17 +209,31 @@ export async function getFeed(scope: Prisma.TaskWhereInput, take = 60, before?: 
               ? `Habit done: ${title}`
               : a.type === "boss.defeated"
                 ? `Boss defeated: “${title}”`
-                : a.type === "focus.ended"
-                  ? d.outcome === "stuck"
-                    ? `Focused ${d.minutes} min on “${title}”, then got stuck`
-                    : Number(d.minutes) < 1
-                      ? `Started a focus on “${title}”`
-                      : `Focused ${d.minutes} min on “${title}”`
-                  : a.type === "digest.sent"
-                    ? "Morning digest sent"
-                    : "Imported from the LifeQuest vault";
-    return { id: a.id, at: a.createdAt.toISOString(), day: fromDbDate(a.on), time: formatClock(clockOf(a.createdAt)), type: a.type, text, xp: a.xp, taskId: a.taskId, space: a.task?.space ?? null };
+                : d.outcome === "stuck"
+                  ? `Focused ${d.minutes} min on “${title}”, then got stuck`
+                  : Number(d.minutes) < 1
+                    ? `Started a focus on “${title}”`
+                    : `Focused ${d.minutes} min on “${title}”`;
+    const group: FeedGroup = ["task.completed", "habit.checked", "boss.defeated"].includes(a.type) ? "done" : "other";
+    return { id: a.id, at: a.createdAt.toISOString(), day: fromDbDate(a.on), time: formatClock(clockOf(a.createdAt)), type: a.type, group, text, body: null, channel: null, xp: a.xp, taskId: a.taskId, space: a.task?.space ?? null };
   });
+  const fromItems = items
+    .filter((i) => !i.taskId || !scoped || spaceOf.has(i.taskId))
+    .map((i): FeedEntry => ({
+      id: i.id,
+      at: i.at.toISOString(),
+      day: localNow(undefined, i.at).date,
+      time: formatClock(clockOf(i.at)),
+      type: i.kind,
+      group: ITEM_GROUP[i.kind] ?? "other",
+      text: (ITEM_TEXT[i.kind] ?? ((t: string) => t))(i.title),
+      body: i.body,
+      channel: i.channel,
+      xp: 0,
+      taskId: i.taskId,
+      space: (i.taskId && spaceOf.get(i.taskId)) || null,
+    }));
+  return [...fromActivity, ...fromItems].sort((a, b) => b.at.localeCompare(a.at)).slice(0, take);
 }
 
 // ── Day timeline (Cockpit) ───────────────────────────────────────────────────

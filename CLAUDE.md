@@ -51,3 +51,10 @@ REDESIGN (2026-11-28, user: "visually not what I was thinking", wants ADHD-frien
 4. Calendar: both Google accounts; OAuth (free) both directions; ask which account receives new events.
 5. Bot takeover per PLAN §6b, one job at a time (Claude page needs Cloudflare Access first).
 6. Android wrapper + widget.
+
+
+## R4+R5 (2026-11-29, committed, NOT deployed)
+- R4: nag until Done/Start/Snooze (lib/nag.ts, Task.nagCount/nagNextAt/snoozeCount, Settings key app.reminders: everyMin/maxSnoozes/telegramAfter/quiet hours/receipts), focus check-ins (FocusSession.checkins), Telegram ✅ receipts via next/server after(), Telegram config in Settings (DB key telegram, env fallback) + BotFather guide, SW buttons Done/Start/Snooze/+10.
+- R5: FeedItem table, getFeed merges Activity+FeedItem w/ filters, POST /api/feed/ingest (FEED_SECRET). Bot hook prepared NOT applied: deploy/secondbrain-bot-feed.md.
+- Tested on PGlite: 22/22 tick/nag/checkin/ingest + browser (snooze limit 409, start link, focus sync). Gotcha: PGlite needs --max-connections=8 when a script + app share it.
+- DEPLOY TODO: user push → Kali: pg_dump backup, `git pull`, append FEED_SECRET to ~/hq/.env (`echo FEED_SECRET=$(openssl rand -hex 24) >> .env`), `docker compose up -d --build`. Then (go) apply bot patch. R6 Android needs Android Studio on user PC.

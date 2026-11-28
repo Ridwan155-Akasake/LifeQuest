@@ -99,9 +99,39 @@ export const settingsInput = z.object({
     /** 0 = Sunday … 6 = Saturday */
     days: z.array(z.number().int().min(0).max(6)).max(7),
   }),
+  /** R4: how hard reminders push. */
+  reminders: z.object({
+    /** Repeat a reminder until Done / Snooze / Start. */
+    nag: z.boolean(),
+    everyMin: z.number().int().min(2).max(60),
+    /** After this many unanswered pings, Telegram gets a copy too. */
+    telegramAfter: z.number().int().min(1).max(20),
+    maxSnoozes: z.number().int().min(0).max(10),
+    /** No nagging in this window (reminders still arrive once). */
+    quietStart: clock,
+    quietEnd: clock,
+    /** Send a ✅ to Telegram every time something is finished. */
+    receipts: z.boolean(),
+  }),
 });
 export type Settings = z.infer<typeof settingsInput>;
-export const DEFAULT_SETTINGS: Settings = { view: "hybrid", sound: true, workHours: { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] } };
+export const DEFAULT_SETTINGS: Settings = {
+  view: "hybrid",
+  sound: true,
+  workHours: { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] },
+  reminders: { nag: true, everyMin: 5, telegramAfter: 3, maxSnoozes: 3, quietStart: "22:00", quietEnd: "07:00", receipts: true },
+};
+
+/** A reminder stops nagging after this many pings even if never answered (≈2h at 5 min). */
+export const MAX_NAGS = 24;
+/** Focus check-ins after the timer runs out: how many, and how far apart (minutes). */
+export const FOCUS_CHECKINS = 3;
+export const FOCUS_CHECKIN_EVERY = 10;
+
+export const telegramInput = z.object({
+  token: z.string().trim().regex(/^\d{5,15}:[A-Za-z0-9_-]{30,60}$/, "That doesn't look like a bot token (it looks like 123456789:AA…)."),
+  chatId: z.string().trim().regex(/^-?\d{3,20}$/, "Chat id is a number, like 123456789."),
+});
 
 export const spaceInput = z.object({
   name: z.string().trim().min(1, "Name the space").max(40),

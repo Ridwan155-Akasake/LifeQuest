@@ -19,7 +19,8 @@ type Tx = Prisma.TransactionClient;
  * no reminder. Always clears `remindedAt`, so moving a reminder re-arms it.
  */
 function reminderFor(dueOn: string | null | undefined, dueTime: string | null | undefined) {
-  return { remindAt: dueOn && dueTime ? zonedToUtc(dueOn, dueTime) : null, remindedAt: null };
+  // A new reminder time starts fresh: no pings sent, no snoozes used.
+  return { remindAt: dueOn && dueTime ? zonedToUtc(dueOn, dueTime) : null, remindedAt: null, nagCount: 0, nagNextAt: null, snoozeCount: 0 };
 }
 
 // ── Read models (what the UI receives — plain, serialisable) ─────────────────

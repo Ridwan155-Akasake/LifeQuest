@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from "react";
 
-import { endFocusAction, setHabitCheckedAction, setStepDoneAction, setTaskDoneAction, startFocusAction } from "@/lib/actions";
+import { endFocusAction, focusStatusAction, setFocusLengthAction, setHabitCheckedAction, setStepDoneAction, setTaskDoneAction, startFocusAction } from "@/lib/actions";
 import { cn } from "@/lib/cn";
 import { FOCUS_LENGTHS } from "@/lib/domain";
 import type { Player } from "@/lib/play";
@@ -107,6 +107,41 @@ export function PlayProvider({ children, sound, level }: { children: React.React
     }
   }, [now, focus, sound]);
 
+  // Re-sync a running timer with the server when the app comes back to the front: a
+  // notification's "✓ Done" or "+10 min" may have ended or stretched it meanwhile.
+  useEffect(() => {
+    if (!focus) return;
+    const sync = async () => {
+      if (document.visibilityState !== "visible") return;
+      const r = await focusStatusAction(focus.sessionId);
+      if (!r.ok || !r.data) return;
+      if (r.data.ended) {
+        setFocus(null);
+        persist(null);
+        leaveFocusMode();
+      } else if (r.data.plannedMin !== focus.plannedMin) {
+        const f = { ...focus, plannedMin: r.data.plannedMin, endsAt: focus.startedAt + r.data.plannedMin * 60_000 };
+        setFocus(f);
+        persist(f);
+      }
+    };
+    void sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, [focus?.sessionId, focus?.plannedMin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Notification "▶ Start" opens /?start=<taskId>&t=<title>: go straight into the timer.
+  const startedFromLink = useRef(false);
+  useEffect(() => {
+    if (startedFromLink.current) return;
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get("start");
+    if (!id) return;
+    startedFromLink.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    begin({ id, title: q.get("t") || "Your task", kind: "task" });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const persist = (f: Focus | null) => {
     try {
       if (f) localStorage.setItem(STORE, JSON.stringify(f));
@@ -190,6 +225,8 @@ export function PlayProvider({ children, sound, level }: { children: React.React
     const f = { ...focus, plannedMin: min, endsAt: focus.startedAt + min * 60_000 };
     setFocus(f);
     persist(f);
+    rang.current = false;
+    void setFocusLengthAction(focus.sessionId, min);
   };
 
   const left = focus ? Math.max(0, Math.round((focus.endsAt - now) / 1000)) : 0;

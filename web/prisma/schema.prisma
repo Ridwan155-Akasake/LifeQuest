@@ -47,13 +47,16 @@ model Setting {
 
 /// A focus timer run on a task ("START"). Outcome: done | stopped | stuck.
 model FocusSession {
-  id         String    @id @default(cuid())
-  taskId     String?
-  plannedMin Int
-  startedAt  DateTime  @default(now())
-  endedAt    DateTime?
-  outcome    String?
-  task       Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  id            String    @id @default(cuid())
+  taskId        String?
+  plannedMin    Int
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+  outcome       String?
+  /// "Time's up — done?" check-ins sent after the planned time ran out.
+  checkins      Int       @default(0)
+  lastCheckinAt DateTime?
+  task          Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   @@index([startedAt])
   @@index([taskId])
@@ -149,6 +152,12 @@ model Task {
   remindAt     DateTime?
   /// When the reminder for the current remindAt was sent. Cleared whenever remindAt moves.
   remindedAt   DateTime?
+  /// Nagging (R4): pings sent for the current reminder, and when the next one is due.
+  /// Cleared by Done, Snooze or Start — the only ways to make a reminder stop.
+  nagCount     Int       @default(0)
+  nagNextAt    DateTime?
+  /// Snoozes used on the current reminder (limited in Settings → Reminders).
+  snoozeCount  Int       @default(0)
   completedAt  DateTime?
   archivedAt   DateTime?
   /// LifeQuest `weekly_focus: true`.
@@ -189,6 +198,7 @@ model Task {
   @@index([dueOn])
   @@index([contactId])
   @@index([remindAt])
+  @@index([nagNextAt])
 }
 
 /// One row per habit per day it was done. "Done today" = a row exists for today —
@@ -313,6 +323,24 @@ model Interaction {
 // ── Notifications ────────────────────────────────────────────────────────────
 
 /// A browser/phone that accepted push notifications (Web Push). One row per device.
+/// Things HQ said or heard outside the app: reminders, nags, check-ins, digests, Telegram
+/// receipts, and (via /api/feed/ingest) Telegram chat from the SecondBrain bot.
+model FeedItem {
+  id      String   @id @default(cuid())
+  /// reminder | nag | checkin | digest | receipt | telegram.in | telegram.out | alert | test
+  kind    String
+  title   String
+  body    String?
+  /// push | telegram | push+telegram | none | in-app
+  channel String?
+  taskId  String?
+  meta    Json     @default("{}")
+  at      DateTime @default(now())
+
+  @@index([at])
+  @@index([kind, at])
+}
+
 model PushSubscription {
   id        String    @id @default(cuid())
   endpoint  String    @unique

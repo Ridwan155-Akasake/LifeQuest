@@ -75,6 +75,7 @@ set_kv() { # set_kv KEY VALUE  (replaces the KEY= line from the example)
 }
 set_kv POSTGRES_PASSWORD "$(openssl rand -hex 24)"
 set_kv CRON_SECRET "$(openssl rand -hex 24)"
+set_kv FEED_SECRET "$(openssl rand -hex 24)"
 while IFS='=' read -r k v; do set_kv "$k" "$v"; done <<< "$OWNER_LINES"
 while IFS='=' read -r k v; do set_kv "$k" "$v"; done <<< "$VAPID_LINES"
 set_kv TELEGRAM_BOT_TOKEN "$TG_TOKEN"

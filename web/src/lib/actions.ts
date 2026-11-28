@@ -2,11 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { requireOwner } from "./auth";
 import { db } from "./db";
-import { CATEGORIES, columnInput, createTaskInput, FOCUS_OUTCOMES, id, settingsInput, spaceInput, updateTaskInput, type Result } from "./domain";
+import { todayISO, toDbDate } from "./dates";
+import { CATEGORIES, columnInput, createTaskInput, FOCUS_OUTCOMES, id, settingsInput, spaceInput, telegramInput, updateTaskInput, type Result } from "./domain";
+import { receipt } from "./nag";
+import * as tg from "./telegram";
 import * as play from "./play";
 import { defaultSpaceId, getScope, saveSettings, SPACE_COOKIE } from "./scope";
 import * as work from "./work";
@@ -55,8 +59,12 @@ export async function setStepDoneAction(stepId: string, done: boolean) {
 export async function setTaskDoneAction(taskId: string, done: boolean): Promise<Result<work.DoneResult & { player: play.Player }>> {
   await requireOwner();
   try {
-    const res = await work.setTaskDone(id.parse(taskId), z.boolean().parse(done));
+    const tid = id.parse(taskId);
+    const before = await db.task.findUnique({ where: { id: tid }, select: { title: true, kind: true, status: true, space: { select: { name: true } } } });
+    const res = await work.setTaskDone(tid, z.boolean().parse(done));
     const player = await play.getPlayer();
+    // ✅ to Telegram after the response, so a slow Telegram never slows the tap. Steps don't send one.
+    if (done && before && before.status !== "done" && before.kind !== "step") after(() => receipt({ title: before.title, xp: res.xp, boss: res.boss, space: before.space?.name, taskId: tid }));
     revalidatePath("/", "layout");
     return { ok: true, data: { ...res, player } };
   } catch (e) {
@@ -76,8 +84,10 @@ export async function setHabitCheckedAction(habitId: string, checked: boolean): 
   await requireOwner();
   try {
     const hid = id.parse(habitId);
+    const wasDone = await db.habitCheck.findFirst({ where: { taskId: hid, on: toDbDate(todayISO()) }, select: { id: true } });
     await work.setHabitChecked(hid, z.boolean().parse(checked));
-    const [habit, player] = await Promise.all([db.task.findUnique({ where: { id: hid }, select: { xp: true } }), play.getPlayer()]);
+    const [habit, player] = await Promise.all([db.task.findUnique({ where: { id: hid }, select: { xp: true, title: true, space: { select: { name: true } } } }), play.getPlayer()]);
+    if (checked && !wasDone && habit) after(() => receipt({ title: habit.title, xp: habit.xp, habit: true, space: habit.space?.name, taskId: hid }));
     revalidatePath("/", "layout");
     return { ok: true, data: { xp: checked ? (habit?.xp ?? 0) : 0, player } };
   } catch (e) {
@@ -177,4 +187,57 @@ export async function addStepsAction(taskId: string, titles: string[]) {
     const list = z.array(z.string().trim().min(1).max(200)).min(1).max(10).parse(titles);
     for (const title of list) await work.createTask({ title, kind: "step", parentId, priority: "medium" });
   });
+}
+
+// ── R4: Telegram from Settings ───────────────────────────────────────────────
+
+/** Check a bot token and say which bot it is. */
+export async function checkBotAction(token: string): Promise<Result<{ username: string }>> {
+  await requireOwner();
+  const t = telegramInput.shape.token.safeParse(token);
+  if (!t.success) return { ok: false, error: t.error.issues[0]?.message ?? "Invalid token" };
+  const r = await tg.botName(t.data);
+  return r.ok ? { ok: true, data: { username: r.username } } : { ok: false, error: r.error };
+}
+
+/** After the user pressed Start on their new bot: find their chat id. */
+export async function findChatIdAction(token: string): Promise<Result<{ chatId: string; name: string }>> {
+  await requireOwner();
+  const t = telegramInput.shape.token.safeParse(token);
+  if (!t.success) return { ok: false, error: t.error.issues[0]?.message ?? "Invalid token" };
+  const r = await tg.findChatId(t.data);
+  return r.ok ? { ok: true, data: { chatId: r.chatId, name: r.name } } : { ok: false, error: r.error };
+}
+
+/** Save the bot, then prove it works with a hello message. */
+export async function saveTelegramAction(input: unknown) {
+  return run(async () => {
+    const { token, chatId } = telegramInput.parse(input);
+    const ok = await tg.sendTelegram("👋 HQ is connected. Reminders you miss on your phone and ✅ receipts for finished tasks will arrive here.", { token, chatId, source: "settings" });
+    if (!ok) throw new Error("Telegram didn't deliver the hello message. Check the token, and that you pressed Start on your bot.");
+    await tg.saveTelegram(token, chatId);
+  }, ["/settings"]);
+}
+
+export async function clearTelegramAction() {
+  return run(() => tg.clearTelegram(), ["/settings"]);
+}
+
+export async function testTelegramAction() {
+  return run(async () => {
+    const ok = await tg.sendTelegram("🧪 HQ test message. Telegram is working.");
+    if (!ok) throw new Error("Telegram isn't set up, or it refused the message.");
+  }, ["/settings"]);
+}
+
+/** The app's local focus timer asks: still running, and for how long? (A notification button may have changed it.) */
+export async function focusStatusAction(sessionId: string): Promise<Result<{ ended: boolean; plannedMin: number }>> {
+  await requireOwner();
+  const f = await db.focusSession.findUnique({ where: { id: id.parse(sessionId) }, select: { endedAt: true, plannedMin: true } });
+  return f ? { ok: true, data: { ended: !!f.endedAt, plannedMin: f.plannedMin } } : { ok: true, data: { ended: true, plannedMin: 0 } };
+}
+
+/** Timer length changed on the focus screen (5 / 15 / 25 / 45 min, or +5). */
+export async function setFocusLengthAction(sessionId: string, minutes: number) {
+  return run(() => db.focusSession.update({ where: { id: id.parse(sessionId) }, data: { plannedMin: z.number().int().min(1).max(240).parse(minutes) } }), []);
 }

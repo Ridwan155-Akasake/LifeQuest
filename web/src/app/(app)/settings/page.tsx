@@ -1,18 +1,21 @@
 import { PushSettings } from "@/components/notifications/push-settings";
 import { SpacesEditor, ViewPicker, WorkHoursEditor } from "@/components/settings/app-settings";
+import { RemindersEditor } from "@/components/settings/reminders";
+import { TelegramSetup } from "@/components/settings/telegram-setup";
 import { db } from "@/lib/db";
 import { vapidPublicKey } from "@/lib/push";
 import { getSettings } from "@/lib/scope";
+import { telegramConfig } from "@/lib/telegram";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const [devices, settings, spaces] = await Promise.all([
+  const [devices, settings, spaces, tg] = await Promise.all([
     db.pushSubscription.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, device: true, createdAt: true, lastOkAt: true, failCount: true } }),
     getSettings(),
     db.space.findMany({ where: { archivedAt: null }, orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { _count: { select: { tasks: { where: { archivedAt: null } } } } } }),
+    telegramConfig(),
   ]);
-  const telegram = Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
   const digest = process.env.DIGEST_TIME || "08:00";
 
   return (
@@ -40,7 +43,7 @@ export default async function SettingsPage() {
       <section className="rounded-card border border-line p-5">
         <h2 className="text-lg font-semibold">Notifications</h2>
         <p className="mt-1 mb-4 text-sm text-fg-muted">
-          Tasks with a time (“call dentist at 3pm”, “in 20 min”) ping you at that time with Done and Snooze buttons. Every morning at {digest} you get a summary of the day.
+          Tasks with a time (“call dentist at 3pm”, “in 20 min”) ping you at that time with Done, Start and Snooze buttons. Every morning at {digest} you get a summary of the day.
         </p>
         <PushSettings vapidKey={vapidPublicKey()} />
       </section>
@@ -62,11 +65,17 @@ export default async function SettingsPage() {
             ))}
           </ul>
         )}
-        <p className="mt-4 text-sm text-fg-muted">
-          Telegram fallback:{" "}
-          {telegram ? <span className="text-live">on</span> : <span className="text-fg-faint">off</span>}
-          <span className="text-fg-faint"> (used only when no device receives a reminder)</span>
-        </p>
+      </section>
+
+      <section className="rounded-card border border-line p-5">
+        <h2 className="text-lg font-semibold">Reminders</h2>
+        <p className="mt-1 mb-4 text-sm text-fg-muted">How hard HQ pushes when you don’t answer.</p>
+        <RemindersEditor value={settings.reminders} telegram={!!tg} />
+      </section>
+
+      <section id="telegram" className="rounded-card border border-line p-5">
+        <h2 className="mb-3 text-lg font-semibold">Telegram</h2>
+        <TelegramSetup status={{ source: tg?.source ?? null, chatId: tg?.chatId ?? null }} />
       </section>
 
       <section className="rounded-card border border-line p-5">

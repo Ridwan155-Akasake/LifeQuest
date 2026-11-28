@@ -61,6 +61,7 @@ services:
       DIGEST_TIME: ${DIGEST_TIME:-08:00}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      FEED_SECRET: ${FEED_SECRET:-}
     # LAN/localhost access for testing. Default binds to the server itself only.
     ports:
       - "${WEB_BIND:-127.0.0.1}:3100:3000"

@@ -195,8 +195,8 @@ User wants HQ to be ADHD-friendly: motivating, pushy, fluid. Mockups: https://cl
 | R1 ✅  Data: Space model + Task.spaceId (IT Firm/ARCNIR → Work, rest → Personal), Settings (view mode, work hours), Task.estimateMin, FocusSession, boss = overdue task (HP = open steps, auto 3 if none), XP/levels switched on | web + DB migration |
 | R2 ✅  New look + shell: tokens, phone tab bar (Now / Plan / Feed / Me), desktop sidebar, space switcher, Settings → View | web |
 | R3 ✅  The three home views + focus timer + reward screen (sound/animation) + split-it steps | web |
-| R4 | Pushiness on web: nag repeats until Done/Snooze/Start (limited snoozes), focus check-ins, Telegram ✅ receipts | web + ticker |
-| R5 | Feed: FeedItem table; HQ logs reminders/check-ins/digests/receipts; bot forwards Telegram chat to HQ (`/api/feed/ingest`) since only one process can read the bot's updates | web + bot (small change) |
+| R4 ✅  Pushiness on web: nag repeats until Done/Snooze/Start (limited snoozes), focus check-ins, Telegram ✅ receipts | web + ticker |
+| R5 ✅  Feed: FeedItem table; HQ logs reminders/check-ins/digests/receipts; bot forwards Telegram chat to HQ (`/api/feed/ingest`) since only one process can read the bot's updates | web + bot (small change) |
 | R6 | Android app (Capacitor, sideloaded APK): full-screen alarm (full-screen intent), focus lock (app blocker), home-screen widget | Android |
 
 ## 10. Beta for friends & family (decided 2026-11-28, NOT started)

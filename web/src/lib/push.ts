@@ -1,15 +1,17 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import webpush from "web-push";
 
 import { db } from "./db";
+import { sendTelegram } from "./telegram";
 
 /**
- * Notification delivery. Web Push to every subscribed device first; Telegram (the old
- * SecondBrain bot's token) as the fallback when no device received it — so a reminder is
- * never silently lost while the phone app is being set up or a subscription has expired.
+ * Notification delivery. Web Push to every subscribed device first; Telegram as the
+ * backup when no device received it (or when asked to copy it there, e.g. a nag nobody
+ * answered). Every notification is also written to the Feed.
  *
- * Env: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT (npm run vapid),
- *      optional TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID for the fallback.
+ * Env: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT (npm run vapid). Telegram is
+ * configured in Settings or .env (see lib/telegram.ts).
  */
 
 export type PushPayload = {
@@ -19,8 +21,14 @@ export type PushPayload = {
   url?: string;
   /** Same tag replaces an older notification instead of stacking (one per task). */
   tag?: string;
-  /** Adds Done / Snooze buttons that act on this task. */
+  /** Adds task buttons (Done / Start / Snooze) that act on this task. */
   taskId?: string;
+  /** Snooze button only while snoozes are left. */
+  snoozesLeft?: number;
+  /** Focus check-in: buttons act on this focus session (Done / +10 min). */
+  focusId?: string;
+  /** Keep the notification on screen until tapped (nags, check-ins). */
+  sticky?: boolean;
 };
 
 let configured: boolean | undefined;
@@ -59,28 +67,25 @@ export async function pushToAll(payload: PushPayload): Promise<{ sent: number; f
   return { sent, failed };
 }
 
-/** Plain-text Telegram message via the bot API. No-op when not configured. */
-export async function sendTelegram(text: string): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chat = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chat) return false;
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+export type FeedKind = "reminder" | "nag" | "checkin" | "digest" | "receipt" | "telegram.in" | "telegram.out" | "alert" | "test";
+
+export async function logFeed(item: { kind: FeedKind; title: string; body?: string | null; channel?: string; taskId?: string | null; meta?: Prisma.InputJsonObject; at?: Date }) {
+  await db.feedItem.create({ data: { kind: item.kind, title: item.title.slice(0, 500), body: item.body?.slice(0, 4000) ?? null, channel: item.channel, taskId: item.taskId ?? null, meta: item.meta ?? {}, ...(item.at ? { at: item.at } : {}) } }).catch(() => {});
 }
 
-/** Push first; Telegram only if no device got it. Returns which channel delivered. */
-export async function notify(payload: PushPayload): Promise<"push" | "telegram" | "none"> {
+const appLink = (url?: string) => (url && process.env.APP_URL ? `\n${process.env.APP_URL.replace(/\/$/, "")}${url}` : "");
+
+/**
+ * Push first; Telegram if no device got it, or always when `alsoTelegram`. Logged to the
+ * Feed as `kind`. Returns which channel(s) delivered.
+ */
+export async function notify(payload: PushPayload, opts: { kind?: FeedKind; alsoTelegram?: boolean; telegramPrefix?: string } = {}): Promise<string> {
   const { sent } = await pushToAll(payload);
-  if (sent > 0) return "push";
-  const link = payload.url && process.env.APP_URL ? `\n${process.env.APP_URL.replace(/\/$/, "")}${payload.url}` : "";
-  return (await sendTelegram(`⏰ ${payload.title}${payload.body ? `\n${payload.body}` : ""}${link}`)) ? "telegram" : "none";
+  let tg = false;
+  if (sent === 0 || opts.alsoTelegram) {
+    tg = await sendTelegram(`${opts.telegramPrefix ?? "⏰"} ${payload.title}${payload.body ? `\n${payload.body}` : ""}${appLink(payload.url)}`);
+  }
+  const channel = sent > 0 && tg ? "push+telegram" : sent > 0 ? "push" : tg ? "telegram" : "none";
+  await logFeed({ kind: opts.kind ?? "reminder", title: payload.title, body: payload.body, channel, taskId: payload.taskId });
+  return channel;
 }
